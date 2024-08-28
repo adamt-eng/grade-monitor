@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34009.444
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grade Monitor", "Grade Monitor.csproj", "{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Debug|x64.ActiveCfg = Debug|x64
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Debug|x64.Build.0 = Debug|x64
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Release|x64.ActiveCfg = Release|x64
+		{E59D8594-F83E-4FBD-95AF-9FFA90B0EC8B}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {DFD445A3-35D2-45C4-97D4-992153F4C6E2}
+	EndGlobalSection
+EndGlobal
