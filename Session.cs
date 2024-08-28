@@ -1,7 +1,6 @@
 ﻿using Discord;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -21,7 +20,7 @@ internal partial class Session(string studentId, string password)
     private string _studentCourses;
     private string _currentSemester;
 
-    internal HashSet<string> Semesters;
+    internal HashSet<string> Semesters = [];
 
     internal int Fails;
 
@@ -44,66 +43,29 @@ internal partial class Session(string studentId, string password)
         _studentCourses = await Program.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient).ConfigureAwait(false);
         _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
-        // Initialize Semesters HashSet
-        Semesters = [];
         foreach (Match semester in SemestersRegex().Matches(_studentCourses))
         {
-            Semesters.Add(semester.Value);
-        }
-
-        if (RequestedSemester == null && message == null)
-        {
-            RequestedSemester = _currentSemester;
-        }
-
-        if (message != null)
-        {
-            var actionRows = message.Components.OfType<ActionRowComponent>();
-            var selectMenus = actionRows.SelectMany(row => row.Components.OfType<SelectMenuComponent>()).ToList();
-
-            RequestedSemester ??= selectMenus[0].Options.First(option => option.IsDefault == true).Value;
-        }
-    }
-    internal async Task<bool> Login()
-    {
-        var html = await Program.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient).ConfigureAwait(false);
-
-        if (html.Contains("login"))
-        {
-            Program.WriteLog("No stored session, initiating login..", ConsoleColor.Red);
-
-            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            if (Semesters.Add(semester.Value) && Program.Configuration.Semesters.All(s => s.Name != semester.Value))
             {
-                { "email", $"{StudentId}@eng.asu.edu.eg" },
-                { "password", password },
-                { "_token", html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false) } // Extract token
-            });
+                Program.Configuration.Semesters.Add(new Semester { Name = semester.Value, Courses = [] });
+            }
+        }
 
-            using var response = await _httpClient.PostAsync("https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
-
-            if (response.IsSuccessStatusCode)
+        if (RequestedSemester == null)
+        {
+            if (message == null)
             {
-                html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-
-                if (html.Contains("alert alert-danger"))
-                {
-                    return false;
-                }
+                RequestedSemester = _currentSemester;
             }
             else
             {
-                throw new Exception($"Login Error: {response.ReasonPhrase}");
+                var actionRows = message.Components.OfType<ActionRowComponent>();
+                var selectMenus = actionRows.SelectMany(row => row.Components.OfType<SelectMenuComponent>()).ToList();
+
+                RequestedSemester = selectMenus[0].Options.First(option => option.IsDefault == true).Value;
             }
         }
-        else
-        {
-            Program.WriteLog("Stored session found, reusing cookies..", ConsoleColor.Magenta);
-        }
-
-        Cgpa = html.ExtractBetween("white\">", "<", lastIndexOf: false);
-        return true;
     }
-
     internal async Task<SortedDictionary<string, string>> FetchGradesReport()
     {
         if (!HeavyLoad)
@@ -111,36 +73,20 @@ internal partial class Session(string studentId, string password)
             try
             {
                 var courses = new Dictionary<string, string>();
-
-                if (!File.Exists(Constants.CoursesBackup))
+                foreach (var semester in Program.Configuration.Semesters)
                 {
-                    var fileStream = File.Create(Constants.CoursesBackup);
-                    await fileStream.DisposeAsync().ConfigureAwait(false);
-                }
-
-                var coursesBackupLines = await File.ReadAllLinesAsync(Constants.CoursesBackup).ConfigureAwait(false);
-                var coursesBackup = string.Join("\n", coursesBackupLines);
-
-                if (coursesBackup.Contains(RequestedSemester))
-                {
-                    foreach (var line in coursesBackupLines)
+                    if (semester.Name == RequestedSemester)
                     {
-                        var data = line.Split("|");
-
-                        var semester = data[0];
-                        var courseName = data[1];
-                        var courseUrl = data[2];
-
-                        Semesters.Add(semester);
-
-                        if (semester == RequestedSemester)
+                        foreach (var course in semester.Courses)
                         {
-                            courses[courseName] = courseUrl;
+                            courses[course.Name] = course.Url;
                         }
                     }
                 }
-                else
+
+                if (courses.Count == 0)
                 {
+                    var coursesHashSetUpdated = false;
                     if (_currentSemester == RequestedSemester)
                     {
                         var myCourses = await Program.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient).ConfigureAwait(false);
@@ -150,8 +96,7 @@ internal partial class Session(string studentId, string password)
                             var courseName = line.ExtractBetween(">", " (");
                             var courseUrl = line.ExtractBetween("\"", "\"");
 
-                            // Add the course to coursesBackup to avoid redundant requests in the future to the faculty server
-                            await AddCourseToCoursesBackup(RequestedSemester, courseName, courseUrl).ConfigureAwait(false);
+                            AddCourse(_currentSemester, courseName, courseUrl);
 
                             courses[courseName] = courseUrl;
                         }
@@ -173,8 +118,7 @@ internal partial class Session(string studentId, string password)
                                 var courseSemester = studentCourses[i + 6].ExtractBetween(">", "<").Trim();
                                 var courseUrl = line.ExtractBetween("\"", "\"");
 
-                                // Add the course to coursesBackup to avoid redundant requests in the future to the faculty server
-                                await AddCourseToCoursesBackup(courseSemester, courseName, courseUrl).ConfigureAwait(false);
+                                AddCourse(courseSemester, courseName, courseUrl);
 
                                 if (courseSemester == RequestedSemester)
                                 {
@@ -189,6 +133,24 @@ internal partial class Session(string studentId, string password)
                             }
                         }
                     }
+
+                    void AddCourse(string courseSemester, string courseName, string courseUrl)
+                    {
+                        foreach (var semester in Program.Configuration.Semesters)
+                        {
+                            if (semester.Name == courseSemester && semester.Courses.All(course => course.Name != courseName))
+                            {
+                                semester.Courses.Add(new Course { Name = courseName, Url = courseUrl });
+                                coursesHashSetUpdated = true;
+                                return;
+                            }
+                        }
+                    }
+
+                    if (coursesHashSetUpdated)
+                    {
+                        Program.ConfigurationManager.SaveSettings(Program.Configuration);
+                    }
                 }
 
                 var grades = new SortedDictionary<string, string>();
@@ -196,14 +158,6 @@ internal partial class Session(string studentId, string password)
                 await Task.WhenAll(courses.Select(Selector)).ConfigureAwait(false);
 
                 return grades;
-
-                async Task AddCourseToCoursesBackup(string courseSemester, string courseName, string courseUrl)
-                {
-                    if (!coursesBackup.Contains(courseName))
-                    {
-                        await File.AppendAllTextAsync(Constants.CoursesBackup, $"{courseSemester}|{courseName}|{courseUrl}\n").ConfigureAwait(false);
-                    }
-                }
 
                 async Task Selector(KeyValuePair<string, string> course)
                 {
@@ -282,4 +236,44 @@ internal partial class Session(string studentId, string password)
 
         return grades;
     }
+    internal async Task<bool> Login()
+    {
+        var html = await Program.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient).ConfigureAwait(false);
+
+        if (html.Contains("login"))
+        {
+            Program.WriteLog("No stored session, initiating login..", ConsoleColor.Red);
+
+            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                { "email", $"{StudentId}@eng.asu.edu.eg" },
+                { "password", password },
+                { "_token", html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false) } // Extract token
+            });
+
+            using var response = await _httpClient.PostAsync("https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+            {
+                html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                if (html.Contains("alert alert-danger"))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                throw new Exception($"Login Error: {response.ReasonPhrase}");
+            }
+        }
+        else
+        {
+            Program.WriteLog("Stored session found, reusing cookies..", ConsoleColor.Magenta);
+        }
+
+        Cgpa = html.ExtractBetween("white\">", "<", lastIndexOf: false);
+        return true;
+    }
+
 }

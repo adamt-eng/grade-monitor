@@ -3,7 +3,6 @@ using Discord.WebSocket;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -22,8 +21,14 @@ internal class Program
     private static readonly Dictionary<ulong, Session> Sessions = [];
     private static readonly DiscordSocketClient Client = new(new DiscordSocketConfig { GatewayIntents = GatewayIntents.AllUnprivileged & ~GatewayIntents.GuildScheduledEvents & ~GatewayIntents.GuildInvites });
 
+    internal static Configuration Configuration;
+    internal static ConfigurationManager ConfigurationManager;
+
     private static async Task Main()
     {
+        ConfigurationManager = new ConfigurationManager("config.json");
+        Configuration = ConfigurationManager.LoadSettings();
+
         Client.Log += message =>
         {
             WriteLog(message.Message, ConsoleColor.Gray);
@@ -40,9 +45,11 @@ internal class Program
             var studentId = dataOptions[0].Value.ToString();
             var password = dataOptions[1].Value.ToString();
 
-            // Link Discord User ID with studentId and password
             var discordUserId = socketSlashCommand.User.Id;
-            await File.WriteAllTextAsync($"Data\\{discordUserId}.txt", $"{studentId}:{password}").ConfigureAwait(false);
+
+            // Save to config.json
+            Configuration.User = new User { DiscordUserId = discordUserId, StudentId = studentId, Password = password };
+            ConfigurationManager.SaveSettings(Configuration);
 
             // Initialize new session and store it
             Sessions[discordUserId] = new Session(studentId: studentId, password: password);
@@ -91,31 +98,41 @@ internal class Program
 
         Client.Ready += async () =>
         {
-            await Task.Delay(0).ConfigureAwait(false);
+            var guild = Client.Guilds.First();
+
+            if ((await guild.GetApplicationCommandsAsync().ConfigureAwait(false)).All(command => command.Name != "get-grades"))
+            {
+                await guild.CreateApplicationCommandAsync(new SlashCommandBuilder
+                {
+                    Name = "get-grades",
+                    Description = "Get your grades.",
+                    Options =
+                    {
+                        new SlashCommandOptionBuilder { Name = "student-id", Description = "Student ID", Type = ApplicationCommandOptionType.String, IsRequired = true },
+                        new SlashCommandOptionBuilder { Name = "password", Description = "Password", Type = ApplicationCommandOptionType.String, IsRequired = true }
+                    }
+                }.Build()).ConfigureAwait(false);
+            }
 
             if (!_botInitialized)
             {
                 _botInitialized = true;
 
-                static async void OnTimerElapsed(object sender, ElapsedEventArgs e)
+                static void OnTimerElapsed(object sender, ElapsedEventArgs e)
                 {
-                    Timer.Interval = 3600000; // 60 Minutes
+                    Timer.Interval = Configuration.TimerIntervalInMinutes * 60000;
 
                     UpdateTimestamp();
 
-                    foreach (var user in new DirectoryInfo("Data").EnumerateFiles())
+                    var user = Configuration.User;
+
+                    if (user != null)
                     {
-                        var fileName = Path.GetFileNameWithoutExtension(user.Name);
-
-                        if (fileName == "Courses_Backup") continue;
-
-                        var discordUserId = Convert.ToUInt64(fileName);
+                        var discordUserId = user.DiscordUserId;
 
                         if (!Sessions.ContainsKey(discordUserId))
                         {
-                            var userData = (await File.ReadAllTextAsync(user.FullName).ConfigureAwait(false)).Split(":");
-
-                            Sessions[discordUserId] = new Session(studentId: userData[0], password: userData[1]);
+                            Sessions[discordUserId] = new Session(studentId: user.StudentId, password: user.Password);
                         }
 
                         GetGrades(discordUserId, sender == null ? "Ready" : "OnTimerElapsed");
@@ -129,7 +146,7 @@ internal class Program
             }
         };
 
-        await Client.LoginAsync(TokenType.Bot, Constants.BotToken).ConfigureAwait(false);
+        await Client.LoginAsync(TokenType.Bot, Configuration.BotToken).ConfigureAwait(false);
         await Client.StartAsync().ConfigureAwait(false);
         await Task.Delay(-1).ConfigureAwait(false);
     }
@@ -265,7 +282,7 @@ internal class Program
             {
                 WriteLog($"Exception: {exception}", ConsoleColor.Red);
 
-                Timer.Interval = 60000; // 1 Minute
+                Timer.Interval = Configuration.TimerIntervalAfterExceptionsInMinutes * 60000;
 
                 UpdateTimestamp();
 
@@ -286,10 +303,8 @@ internal class Program
         catch { }
     }
 
-    private static ButtonBuilder RefreshButton()
-    {
-        return new ButtonBuilder().WithLabel("Refresh").WithStyle(ButtonStyle.Secondary).WithEmote(new Emoji("\ud83d\udd04")).WithCustomId("refresh");
-    }
+    private static ButtonBuilder RefreshButton() => new ButtonBuilder().WithLabel("Refresh").WithStyle(ButtonStyle.Secondary).WithEmote(new Emoji("\ud83d\udd04")).WithCustomId("refresh");
+
     private static MessageComponent GenerateComponentBuilder(HashSet<string> semesters, string requestedSemester, bool heavyLoad)
     {
         var selectSemesterMenuOptions = new List<SelectMenuOptionBuilder>();
@@ -351,7 +366,8 @@ internal class Program
     }
     internal static async Task<string> FetchPage(string url, HttpClient httpClient)
     {
-        var retryCount = 15;
+        var retryCount = 10;
+        var retryDelay = 3000;
         var attempt = 0;
 
         while (attempt < retryCount)
@@ -373,7 +389,7 @@ internal class Program
                     throw new Exception($"Failed to fetch page after {attempt} attempts. Last error: {ex.Message}", ex);
                 }
 
-                await Task.Delay(2500).ConfigureAwait(false);
+                await Task.Delay(retryDelay * attempt).ConfigureAwait(false);
             }
         }
 
