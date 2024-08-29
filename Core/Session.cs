@@ -29,7 +29,7 @@ internal partial class Session(string studentId, string password)
     internal bool HeavyLoad;
 
     private static readonly CookieContainer CookieContainer = new();
-    private readonly HttpClient _httpClient = new(new HttpClientHandler { CookieContainer = CookieContainer })
+    private readonly HttpClient _httpClient = new(new HttpClientHandler { UseProxy = false, CookieContainer = CookieContainer })
     {
         DefaultRequestHeaders =
         {
