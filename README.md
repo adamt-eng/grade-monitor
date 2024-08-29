@@ -22,9 +22,32 @@ A Discord bot that automates the retrieval of grades from the [faculty portal](h
 
 - **Error Handling:** The bot provides feedback if the login fails due to incorrect credentials or if the faculty server is down. In the event of a failure, it retries the process using the built-in retry mechanism.
 
-## Usage
+## Setup Instructions
 
-Once the bot is [set up](#setup-instructions) and running on your Discord server, you can interact with it using the following commands and options:
+1. **Create a Discord Bot:**
+
+   - Create a new application from the [Discord Developer Portal](https://discord.com/developers/applications).
+
+   - Application scopes must contain `application.commands` and `bot`.
+
+   - Copy the bot's token; you'll need this later.
+     
+   - Copy the bot's install link and use it to add the bot to your desired server.
+
+2. **Download the application:**
+
+   - Download the latest release of this project from the [releases page](https://github.com/adamt-eng/grade-monitor/releases).
+
+3. **Run the Application:**
+
+   > ⚠️ **Important Note:** 
+   > For the application to continuously monitor grades, you must keep it running. I personally keep it running on a [Virtual Private Server (VPS)](https://cloud.google.com/learn/what-is-a-virtual-private-server), which costs money. Alternatively, you can simply keep it running while using your laptop/PC.
+
+   - Run the application and input your Discord bot token.
+
+   - The bot will automatically register the `/get-grades` command on your server.
+
+## Usage
 
 ### 1. Fetch Grades
 
@@ -58,46 +81,11 @@ To manually refresh and check for updated grades:
 
 - Click the "Refresh" button in the private message sent by the bot.
 
-- The bot will re-fetch the grade data based on the current semester and load selection.
+- The bot will refetch the grade data based on the current semester and load selection.
 
 This interaction flow ensures that you always have access to your most up-to-date grades while providing flexibility to manage how data is retrieved based on server conditions.
 
-## Setup Instructions
-
-1. **Create a Discord Bot:**
-
-   - Create a new application from the [Discord Developer Portal](https://discord.com/developers/applications).
-
-   - Application scopes must contain `application.commands` and `bot`.
-
-   - Copy the bot's token; you'll need this later.
-     
-   - Copy the bot's install link and use it to add the bot to your desired server.
-
-2. **Download the Project:**
-
-   - Download the latest release of the project from the [releases page](https://github.com/adamt-eng/grade-monitor/releases).
-
-3. **Run the Application:**
-
-   > ⚠️ **Important Note:** 
-   > The application needs to be running in order to check for updated grades. I personally keep it running on a Virtual Private Server (VPS), which costs money. Alternatively, you can just keep it running while you're using your system.
-
-   - Execute the application and input your Discord bot token.
-
-   - The bot will automatically register the `/get-grades` command on your server.
-
-5. **Using the Bot:**
-
-   - Use the `/get-grades` slash command in your Discord server:
-
-     ```
-     /get-grades student-id:23P0001 password:tHiSiSmYpAsSwOrD
-     ```
-
-   - The bot will send the grades to you in a private message.
-
-6. **Configuration:**
+## Configuration
 
    - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually unless you are sure about what you are doing.
 
