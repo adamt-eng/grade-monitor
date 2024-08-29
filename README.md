@@ -81,12 +81,15 @@ This interaction flow ensures that you always have access to your most up-to-dat
    - Download the latest release of the project from the [releases page](https://github.com/adamt-eng/grade-monitor/releases).
 
 3. **Run the Application:**
+> ⚠️ **Important Note:** 
+> 
+> The applicatiom needs to be running in order to check for updated grades, I personally keep it running on a Virtual Private Server (VPS), these cost money, alternatively you can just keep it running while you're using your system.
 
    - Execute the application and input your Discord bot token.
 
    - The bot will automatically register the `/get-grades` command on your server.
 
-4. **Using the Bot:**
+5. **Using the Bot:**
 
    - Use the `/get-grades` slash command in your Discord server:
 
@@ -96,7 +99,7 @@ This interaction flow ensures that you always have access to your most up-to-dat
 
    - The bot will send the grades to you in a private message.
 
-5. **Configuration:**
+6. **Configuration:**
 
    - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually unless you are sure about what you are doing.
 
