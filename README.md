@@ -1,6 +1,6 @@
 ### Grade Monitor For Faculty of Engineering - Ain Shams University Students
 
-A Discord bot that automates the retrieval of grades from the <a href="https://eng.asu.edu.eg/login" target="_blank">faculty portal</a> and sends them directly to the user via private messages. The bot allows users to select different semesters, manage server load, and refresh data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
+A Discord bot that automates the retrieval of grades from the [faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via private messages. The bot allows users to select different semesters, manage server load, and refresh data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
 ## Features
 
