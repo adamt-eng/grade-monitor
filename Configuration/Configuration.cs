@@ -5,7 +5,7 @@ namespace Grade_Monitor.Configuration;
 public class Configuration
 {
     public string BotToken { get; set; }
-    public User User { get; set; }
+    public User User { get; set; } = new();
     public int TimerIntervalInMinutes { get; set; } = 60;
     public int TimerIntervalAfterExceptionsInMinutes { get; set; } = 1;
     public HashSet<Semester> Semesters { get; set; } = [];

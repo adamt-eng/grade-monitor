@@ -14,23 +14,21 @@ namespace Grade_Monitor.Core;
 
 internal class Program
 {
-    private static bool _botInitialized;
-
     private static string _nextRefresh = string.Empty;
-
     private static readonly Timer Timer = new();
-
     private static readonly Dictionary<ulong, Session> Sessions = [];
     private static readonly DiscordSocketClient Client = new(new DiscordSocketConfig { GatewayIntents = GatewayIntents.AllUnprivileged & ~GatewayIntents.GuildScheduledEvents & ~GatewayIntents.GuildInvites });
 
-    internal static Configuration.Configuration Configuration;
     internal static ConfigurationManager ConfigurationManager;
+    internal static Configuration.Configuration Configuration;
 
     private static async Task Main()
     {
-        ConfigurationManager = new ConfigurationManager("config.json");
-        Configuration = ConfigurationManager.LoadSettings();
+        var botInitialized = false;
 
+        ConfigurationManager = new ConfigurationManager("config.json");
+        Configuration = ConfigurationManager.Load();
+        
         Client.Log += message =>
         {
             WriteLog(message.Message, ConsoleColor.Gray);
@@ -50,7 +48,7 @@ internal class Program
             var discordUserId = socketSlashCommand.User.Id;
 
             // Save new user data
-            var user = Configuration.User ?? new User();
+            var user = Configuration.User;
             user.DiscordUserId = discordUserId;
             user.StudentId = studentId;
             user.Password = password;
@@ -61,7 +59,7 @@ internal class Program
             Configuration.Semesters.Clear();
 
             // Update config.json
-            ConfigurationManager.SaveSettings(Configuration);
+            ConfigurationManager.Save(Configuration);
 
             // Initialize new session and store it
             Sessions[discordUserId] = new Session(studentId: studentId, password: password);
@@ -126,9 +124,9 @@ internal class Program
                 }.Build()).ConfigureAwait(false);
             }
 
-            if (!_botInitialized)
+            if (!botInitialized)
             {
-                _botInitialized = true;
+                botInitialized = true;
 
                 static void OnTimerElapsed(object sender, ElapsedEventArgs e)
                 {

@@ -153,7 +153,7 @@ internal partial class Session(string studentId, string password)
 
                     if (coursesHashSetUpdated)
                     {
-                        Program.ConfigurationManager.SaveSettings(Program.Configuration);
+                        Program.ConfigurationManager.Save(Program.Configuration);
                     }
                 }
 
