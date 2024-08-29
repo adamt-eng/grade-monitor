@@ -82,9 +82,9 @@ This interaction flow ensures that you always have access to your most up-to-dat
 
 3. **Run the Application:**
 
-   - ⚠️ **Important Note:** 
-     
-     > The application needs to be running in order to check for updated grades. I personally keep it running on a Virtual Private Server (VPS), which costs money. Alternatively, you can just keep it running while you're using your system.
+   > > ⚠️ **Important Note:** 
+   > > 
+   > > The application needs to be running in order to check for updated grades. I personally keep it running on a Virtual Private Server (VPS), which costs money. Alternatively, you can just keep it running while you're using your system.
 
    - Execute the application and input your Discord bot token.
 
