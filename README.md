@@ -100,4 +100,6 @@ This interaction flow ensures that you always have access to your most up-to-dat
 
    - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually unless you are sure about what you are doing.
 
-   - If your password changes, you can update it by re-running the `/get-grades` command with the new password.
+   - If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
+     
+   - If you add/drop/withdraw courses, you can force the application to add the new courses or remove the dropped/withdrawn courses by re-running the `/get-grades` command.
