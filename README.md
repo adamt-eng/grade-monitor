@@ -20,8 +20,6 @@ A Discord bot that automates the retrieval of grades from the [faculty portal](h
 
 - **Fetching Grades:** The bot fetches grades by navigating to the relevant pages on the faculty portal. Depending on the load selection specified by the user, it either fetches detailed grades (Normal Load) or only the final grades (Heavy Load).
 
-- **Session Management:** By utilizing cookies, the bot maintains a session across multiple requests, avoiding the need for frequent logins.
-
 - **Error Handling:** The bot provides feedback if the login fails due to incorrect credentials or if the faculty server is down. In the event of a failure, it retries the process using the built-in retry mechanism.
 
 ## Usage
