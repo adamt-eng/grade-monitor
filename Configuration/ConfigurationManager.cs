@@ -1,9 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using Grade_Monitor.Core;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.IO;
 
-namespace Grade_Monitor;
+namespace Grade_Monitor.Configuration;
 
 public class ConfigurationManager(string configFilePath)
 {

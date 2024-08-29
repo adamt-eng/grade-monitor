@@ -1,13 +1,15 @@
-﻿using Discord;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Discord;
+using Grade_Monitor.Configuration;
+using Grade_Monitor.Utilities;
 
-namespace Grade_Monitor;
+namespace Grade_Monitor.Core;
 
 internal partial class Session(string studentId, string password)
 {
@@ -72,6 +74,8 @@ internal partial class Session(string studentId, string password)
         {
             try
             {
+                // Check first if the semester's courses were already saved before
+                // If user has withdrawn/dropped/added courses, they must use the slash command again
                 var courses = new Dictionary<string, string>();
                 foreach (var semester in Program.Configuration.Semesters)
                 {

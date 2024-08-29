@@ -1,5 +1,7 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Grade_Monitor.Configuration;
+using Grade_Monitor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,7 +10,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Timers;
 
-namespace Grade_Monitor;
+namespace Grade_Monitor.Core;
 
 internal class Program
 {
@@ -21,7 +23,7 @@ internal class Program
     private static readonly Dictionary<ulong, Session> Sessions = [];
     private static readonly DiscordSocketClient Client = new(new DiscordSocketConfig { GatewayIntents = GatewayIntents.AllUnprivileged & ~GatewayIntents.GuildScheduledEvents & ~GatewayIntents.GuildInvites });
 
-    internal static Configuration Configuration;
+    internal static Configuration.Configuration Configuration;
     internal static ConfigurationManager ConfigurationManager;
 
     private static async Task Main()
@@ -47,8 +49,18 @@ internal class Program
 
             var discordUserId = socketSlashCommand.User.Id;
 
-            // Save to config.json
-            Configuration.User = new User { DiscordUserId = discordUserId, StudentId = studentId, Password = password };
+            // Save new user data
+            var user = Configuration.User ?? new User();
+            user.DiscordUserId = discordUserId;
+            user.StudentId = studentId;
+            user.Password = password;
+
+            // Clear to force the application to refetch each semester's courses again
+            // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
+            // They must use the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
+            Configuration.Semesters.Clear();
+
+            // Update config.json
             ConfigurationManager.SaveSettings(Configuration);
 
             // Initialize new session and store it

@@ -1,4 +1,4 @@
-﻿namespace Grade_Monitor;
+﻿namespace Grade_Monitor.Utilities;
 
 internal static class Constants
 {

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Grade_Monitor;
+namespace Grade_Monitor.Configuration;
 
 public class Configuration
 {
