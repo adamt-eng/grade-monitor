@@ -24,28 +24,70 @@ A Discord bot that automates the retrieval of grades from the [faculty portal](h
 
 ## Setup Instructions
 
-1. **Create a Discord Bot:**
+### 1. **Create a Discord Bot:**
 
-   - Create a new application from the [Discord Developer Portal](https://discord.com/developers/applications).
+- Create a new application from the [Discord Developer Portal](https://discord.com/developers/applications).
 
-   - Application scopes must contain `application.commands` and `bot`.
+- Application scopes must contain `application.commands` and `bot`.
 
-   - Copy the bot's token; you'll need this later.
-     
-   - Copy the bot's install link and use it to add the bot to your desired server.
+- Copy the bot's token; you'll need this later.
 
-2. **Download the application:**
+- Copy the bot's install link and use it to add the bot to your desired server.
 
-   - Download the latest release of this project from the [releases page](https://github.com/adamt-eng/grade-monitor/releases).
+### 2. **Prerequisites**
 
-3. **Run the Application:**
+- Ensure that you have [.NET 8.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) installed on your machine:
 
-   > ⚠️ **Important Note:** 
-   > For the application to continuously monitor grades, you must keep it running. I personally keep it running on a [Virtual Private Server (VPS)](https://cloud.google.com/learn/what-is-a-virtual-private-server), which costs money. Alternatively, you can simply keep it running while using your laptop/PC.
+- You can verify the .NET SDK installation by running:
 
-   - Run the application and input your Discord bot token.
+  ```bash
+  dotnet --version
+  ```
 
-   - The bot will automatically register the `/get-grades` command on your server.
+### 3. **Download the Source Code**
+
+- Clone this repository using the following command:
+
+  ```bash
+  git clone https://github.com/adamt-eng/grade-monitor
+  ```
+
+### 4. **Navigate to the Project Directory**
+
+- After cloning the repository, navigate into the project directory:
+
+  ```bash
+  cd grade-monitor
+  ```
+
+### 5. **Compile the Source Code**
+
+- Restore dependencies with the following command:
+
+  ```bash
+  dotnet restore
+  ```
+
+- Once dependencies are restored, compile the project using:
+
+  ```bash
+  dotnet build
+  ```
+
+### 6. **Run the Application:**
+
+- If the build is successful, you can run the application with:
+
+  ```bash
+  dotnet run
+  ```
+
+> :warning: **Important Note:** 
+> For the application to continuously monitor grades, you must keep it running. You might consider using a [Virtual Private Server (VPS)](https://cloud.google.com/learn/what-is-a-virtual-private-server) to keep it running 24/7. Alternatively, you can run it locally on your machine whenever needed.
+
+- During the first run, the application will prompt you to input your Discord bot token.
+
+- Upon inserting your Discord bot token, the bot will automatically register the `/get-grades` command on your server.
 
 ## Usage
 
