@@ -127,6 +127,9 @@ To manually refresh and check for updated grades:
 
 This interaction flow ensures that you always have access to your most up-to-date grades while providing flexibility to manage how data is retrieved based on server conditions.
 
+## Showcase
+![Showcase](Showcase.gif)
+
 ## Configuration
 
    - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually unless you are sure about what you are doing.
