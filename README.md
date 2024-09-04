@@ -130,6 +130,8 @@ This interaction flow ensures that you always have access to your most up-to-dat
 ## Showcase
 ![Showcase](Showcase.gif)
 
+- Empty result when using `Heavy Load` indicates that final grades for the specified semester aren't released yet.
+
 ## Configuration
 
    - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually unless you are sure about what you are doing.
