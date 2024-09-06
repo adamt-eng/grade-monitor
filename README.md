@@ -71,7 +71,7 @@ A Discord bot that automates the retrieval of grades from the [faculty portal](h
 - Once dependencies are restored, compile the project using:
 
   ```bash
-  dotnet build
+  dotnet build --configuration Release
   ```
 
 ### 6. **Run the Application:**
