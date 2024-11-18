@@ -68,7 +68,87 @@ internal partial class Session(string studentId, string password)
             }
         }
     }
-    internal async Task<SortedDictionary<string, string>> FetchGradesReport()
+
+    private async Task RefreshUrls(Dictionary<string, string> courses)
+    {
+        var coursesHashSetUpdated = false;
+        if (_currentSemester == RequestedSemester)
+        {
+            var myCourses = await Program.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient).ConfigureAwait(false);
+
+            foreach (var line in myCourses.Split('\n').Where(line => line.Contains(_currentSemester)))
+            {
+                var courseName = line.ExtractBetween(">", " (");
+                var courseUrl = line.ExtractBetween("\"", "\"");
+
+                AddCourse(_currentSemester, courseName, courseUrl);
+
+                courses[courseName] = courseUrl;
+            }
+        }
+        else
+        {
+            var studentCourses = _studentCourses.Split("\n");
+
+            var i = 0;
+
+            while (i < studentCourses.Length)
+            {
+                var line = studentCourses[i];
+
+                if (line.Contains("\"https://eng.asu.edu.eg/dashboard/"))
+                {
+                    var courseCode = studentCourses[i - 3].ExtractBetween(">", "<");
+                    var courseName = $"{courseCode}: {line.ExtractBetween(">", "<")}";
+                    var courseSemester = studentCourses[i + 6].ExtractBetween(">", "<").Trim();
+                    var courseUrl = line.ExtractBetween("\"", "\"");
+
+                    AddCourse(courseSemester, courseName, courseUrl);
+
+                    if (courseSemester == RequestedSemester)
+                    {
+                        courses[courseName] = courseUrl;
+                    }
+
+                    i += 40; // The distance between each line we need to read is 40 lines
+                }
+                else
+                {
+                    i++;
+                }
+            }
+        }
+
+        void AddCourse(string courseSemester, string courseName, string courseUrl)
+        {
+            foreach (var semester in Program.Configuration.Semesters)
+            {
+                if (semester.Name == courseSemester)
+                {
+                    // Remove course old data
+                    foreach (var course in semester.Courses)
+                    {
+                        if (course.Name == courseName)
+                        {
+                            semester.Courses.Remove(course);
+                            break;
+                        }
+                    }
+
+                    // Add new course data
+                    semester.Courses.Add(new Course { Name = courseName, Url = courseUrl });
+                    coursesHashSetUpdated = true;
+                    return;
+                }
+            }
+        }
+
+        if (coursesHashSetUpdated)
+        {
+            Program.ConfigurationManager.Save(Program.Configuration);
+        }
+    }
+    internal async Task<SortedDictionary<string, string>> FetchGradesReport(bool fetchUrls = false)
     {
         if (!HeavyLoad)
         {
@@ -88,73 +168,10 @@ internal partial class Session(string studentId, string password)
                     }
                 }
 
+                // If no courses stored, fetch them
                 if (courses.Count == 0)
                 {
-                    var coursesHashSetUpdated = false;
-                    if (_currentSemester == RequestedSemester)
-                    {
-                        var myCourses = await Program.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient).ConfigureAwait(false);
-
-                        foreach (var line in myCourses.Split('\n').Where(line => line.Contains(_currentSemester)))
-                        {
-                            var courseName = line.ExtractBetween(">", " (");
-                            var courseUrl = line.ExtractBetween("\"", "\"");
-
-                            AddCourse(_currentSemester, courseName, courseUrl);
-
-                            courses[courseName] = courseUrl;
-                        }
-                    }
-                    else
-                    {
-                        var studentCourses = _studentCourses.Split("\n");
-
-                        var i = 0;
-
-                        while (i < studentCourses.Length)
-                        {
-                            var line = studentCourses[i];
-
-                            if (line.Contains("\"https://eng.asu.edu.eg/dashboard/"))
-                            {
-                                var courseCode = studentCourses[i - 3].ExtractBetween(">", "<");
-                                var courseName = $"{courseCode}: {line.ExtractBetween(">", "<")}";
-                                var courseSemester = studentCourses[i + 6].ExtractBetween(">", "<").Trim();
-                                var courseUrl = line.ExtractBetween("\"", "\"");
-
-                                AddCourse(courseSemester, courseName, courseUrl);
-
-                                if (courseSemester == RequestedSemester)
-                                {
-                                    courses[courseName] = courseUrl;
-                                }
-
-                                i += 40; // The distance between each line we need to read is 40 lines
-                            }
-                            else
-                            {
-                                i++;
-                            }
-                        }
-                    }
-
-                    void AddCourse(string courseSemester, string courseName, string courseUrl)
-                    {
-                        foreach (var semester in Program.Configuration.Semesters)
-                        {
-                            if (semester.Name == courseSemester && semester.Courses.All(course => course.Name != courseName))
-                            {
-                                semester.Courses.Add(new Course { Name = courseName, Url = courseUrl });
-                                coursesHashSetUpdated = true;
-                                return;
-                            }
-                        }
-                    }
-
-                    if (coursesHashSetUpdated)
-                    {
-                        Program.ConfigurationManager.Save(Program.Configuration);
-                    }
+                    await RefreshUrls(courses).ConfigureAwait(false);
                 }
 
                 var grades = new SortedDictionary<string, string>();
@@ -169,6 +186,16 @@ internal partial class Session(string studentId, string password)
 
                     var htmlLines = (await Program.FetchPage(course.Value, _httpClient).ConfigureAwait(false)).Split('\n');
                     var filteredHtmlLines = htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
+
+                    // This case can occur when the link for the course is updated and the saved one now redirects
+                    // to an error page that does not contain the keywords used for identifying the grades
+                    // If this occurs, it will refetch all the courses urls using RefreshUrls() to get the updated links
+                    if (filteredHtmlLines.Count == 0)
+                    {
+                        courses.Clear();
+                        await RefreshUrls(courses).ConfigureAwait(false);
+                        filteredHtmlLines = (await Program.FetchPage(courses[course.Key], _httpClient).ConfigureAwait(false)).Split('\n').Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
+                    }
 
                     for (var i = 0; i < filteredHtmlLines.Count; i++)
                     {
