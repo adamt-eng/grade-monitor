@@ -45,22 +45,28 @@ internal partial class Session(string studentId, string password)
         _studentCourses = await Program.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient).ConfigureAwait(false);
         _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
+        // For each semester the student took a course during
         foreach (Match semester in SemestersRegex().Matches(_studentCourses))
         {
+            // Add the semester to the configuration
             if (Semesters.Add(semester.Value) && Program.Configuration.Semesters.All(s => s.Name != semester.Value))
             {
                 Program.Configuration.Semesters.Add(new Semester { Name = semester.Value, Courses = [] });
             }
         }
 
+        // If semester not specified
         if (RequestedSemester == null)
         {
+            // If no message found, set the requested semester to the current semester
             if (message == null)
             {
                 RequestedSemester = _currentSemester;
             }
             else
             {
+                // Else: set it to the semester selected by the user on the message
+
                 var actionRows = message.Components.OfType<ActionRowComponent>();
                 var selectMenus = actionRows.SelectMany(row => row.Components.OfType<SelectMenuComponent>()).ToList();
 
@@ -72,10 +78,14 @@ internal partial class Session(string studentId, string password)
     private async Task RefreshUrls(Dictionary<string, string> courses)
     {
         var coursesHashSetUpdated = false;
+        
         if (_currentSemester == RequestedSemester)
         {
+            // Read all courses
             var myCourses = await Program.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient).ConfigureAwait(false);
-
+            
+            // For each course registered in the current semester
+            // Get the course's name and url and add it to the configuration
             foreach (var line in myCourses.Split('\n').Where(line => line.Contains(_currentSemester)))
             {
                 var courseName = line.ExtractBetween(">", " (");
