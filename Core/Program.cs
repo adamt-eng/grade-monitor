@@ -16,6 +16,7 @@ internal class Program
 {
     private static string _nextRefresh = string.Empty;
     private static readonly Timer Timer = new();
+
     private static readonly Dictionary<ulong, Session> Sessions = [];
     private static readonly DiscordSocketClient Client = new(new DiscordSocketConfig { GatewayIntents = GatewayIntents.AllUnprivileged & ~GatewayIntents.GuildScheduledEvents & ~GatewayIntents.GuildInvites });
 
@@ -26,36 +27,38 @@ internal class Program
     {
         var botInitialized = false;
 
+        // Load configuration
         ConfigurationManager = new ConfigurationManager("config.json");
         Configuration = ConfigurationManager.Load();
         
+        // Log event handler
         Client.Log += message =>
         {
             WriteLog(message.Message, ConsoleColor.Gray);
             return Task.CompletedTask;
         };
 
+        // Slash command handler
         Client.SlashCommandExecuted += async socketSlashCommand =>
         {
             // Acknowledge this interaction
             await socketSlashCommand.DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-            // Extract studentId and password
+            // Extract studentId, password, and discordUserId
             var dataOptions = socketSlashCommand.Data.Options.ToList();
             var studentId = dataOptions[0].Value.ToString();
             var password = dataOptions[1].Value.ToString();
-
             var discordUserId = socketSlashCommand.User.Id;
 
-            // Save new user data
+            // Save new user
             var user = Configuration.User;
             user.DiscordUserId = discordUserId;
             user.StudentId = studentId;
             user.Password = password;
 
-            // Clear to force the application to refetch each semester's courses again
+            // Clear stored semester data to force the application to refetch them
             // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
-            // They must use the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
+            // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
             Configuration.Semesters.Clear();
 
             // Update config.json
@@ -74,8 +77,10 @@ internal class Program
             // Acknowledge this interaction
             await socketMessageComponent.DeferAsync(ephemeral: true).ConfigureAwait(false);
 
+            // Extract discordUserId
             var discordUserId = socketMessageComponent.User.Id;
 
+            // Get user selection
             var data = socketMessageComponent.Data;
             var selection = data.Values.First();
             var customId = data.CustomId;
@@ -162,9 +167,10 @@ internal class Program
     }
     private static void UpdateTimestamp()
     {
-        var offset = 10; // In ideal conditions, takes on average 10 seconds to read grades
+        var offset = 10; // Usually takes 10 seconds to read grades
+        var nextRefresh = ((DateTimeOffset)DateTime.Now.AddMilliseconds(Timer.Interval).AddSeconds(offset)).ToUnixTimeSeconds();
 
-        _nextRefresh = $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddMilliseconds(Timer.Interval).AddSeconds(offset)).ToUnixTimeSeconds()}:R> {new Emoji("🕒")}";
+        _nextRefresh = $"Next refresh <t:{nextRefresh}:R> {new Emoji("🕒")}";
     }
     internal static void WriteLog(string log, ConsoleColor consoleColor)
     {
@@ -176,13 +182,13 @@ internal class Program
     {
         try
         {
-            // New line for seperation
+            // New line to seperate events
             Console.WriteLine();
 
             // Log interaction
             WriteLog($"{interactionType} {discordUserId}", ConsoleColor.Cyan);
 
-            // Stopwatch to keep track of how fast we're obtaining grades
+            // Stopwatch to keep track of how fast we're reading grades
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
@@ -193,32 +199,44 @@ internal class Program
             var message = (IUserMessage)null;
             var previousEmbedBuilder = (EmbedBuilder)null;
 
+            // If there was a previous message sent between the user and the bot
             if (messages.Count == 1)
             {
                 message = (IUserMessage)messages.First();
 
+                // Store the embed builder from that message (previousEmbedBuilder)
+                // The previousEmbedBuilder contains the last saved grades which we need to detect if grades were updated
                 if (message.Embeds.Count == 1)
                 {
                     previousEmbedBuilder = message.Embeds.First().ToEmbedBuilder();
                 }
+                // If it doesn't have an embed then that indicates that an error has occurred while logging in or accessing faculty site
+                // Set message to null (explained later)
                 else
                 {
                     message = null;
                 }
             }
 
+            // message will be null only if one of two things happened:
+            // 1. An error has occurred while logging in or accessing faculty site
+            // 2. There was more than one message in the DM channel (not supposed to happen except due to misusage of the app
             if (message == null)
             {
+                // Delete all messages in the DM channel
                 foreach (var item in messages)
                 {
                     await item.DeleteAsync().ConfigureAwait(false);
                 }
             }
+            // If message was null, a new message is sent regardless of whether the grades were updated
 
+            // Get specified user session
             var session = Sessions[discordUserId];
 
             try
             {
+                // Attempt login
                 if (await session.Login().ConfigureAwait(false))
                 {
                     await session.InitializeMembers(message).ConfigureAwait(false);
@@ -251,12 +269,11 @@ internal class Program
 
                     var components = GenerateComponentBuilder(session.Semesters, session.RequestedSemester, session.HeavyLoad);
 
-                    // If the call was from the timer and the embeds are identical (aka grades not changed)
-                    // Or if the user changed the semester or load selection
+                    // If the call was from the timer and the embeds are identical (aka; grades not changed)
+                    // Or if the user changed their selection of semester or load
                     if (message != null && (interactionType.Contains("SelectMenuExecuted") || interactionType == "OnTimerElapsed" && embedBuilder.IdenticalTo(previousEmbedBuilder)))
                     {
-                        // Silently update the timestamp in the message to indicate that the app is working
-
+                        // Silently update the timestamp in the already sent message to indicate that the app is functioning as expected
                         await message.ModifyAsync(Update).ConfigureAwait(false);
 
                         void Update(MessageProperties properties)
@@ -270,7 +287,6 @@ internal class Program
                     // 1. Grades Updated
                     // 2. Refresh Button Executed
                     // 3. Registration Slash Command Executed
-                    // 4. 0 messages or more than 1 message were in the DM Channel
                     else
                     {
                         if (message != null)
@@ -281,6 +297,7 @@ internal class Program
                         await user.SendMessageAsync(text: _nextRefresh, embed: embedBuilder.Build(), components: components).ConfigureAwait(false);
                     }
 
+                    // Reset fails counter
                     session.Fails = 0;
                 }
                 else

@@ -28,7 +28,7 @@ internal partial class Session(string studentId, string password)
 
     internal bool HeavyLoad;
 
-    private static readonly CookieContainer CookieContainer = new();
+    private static readonly CookieContainer CookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
     private readonly HttpClient _httpClient = new(new HttpClientHandler { UseProxy = false, CookieContainer = CookieContainer })
     {
         DefaultRequestHeaders =
@@ -279,8 +279,10 @@ internal partial class Session(string studentId, string password)
     }
     internal async Task<bool> Login()
     {
+        // Attempt to visit dashboard
         var html = await Program.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient).ConfigureAwait(false);
 
+        // If the below condition is true, this indicates that user was redirected to login page because they're not logged in
         if (html.Contains("login"))
         {
             Program.WriteLog("No stored session, initiating login..", ConsoleColor.Red);
@@ -313,6 +315,7 @@ internal partial class Session(string studentId, string password)
             Program.WriteLog("Stored session found, reusing cookies..", ConsoleColor.Magenta);
         }
 
+        // Extract CGPA from dashboard
         Cgpa = html.ExtractBetween("white\">", "<", lastIndexOf: false);
         return true;
     }
