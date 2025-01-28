@@ -1,30 +1,30 @@
 ### Grade Monitor For Faculty of Engineering - Ain Shams University Students
 
-A Discord bot that automates the retrieval of grades from the [faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via private messages. The bot allows users to select different semesters, manage server load, and refresh data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
+An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters, manage server load, and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
 ## Features
 
-- **Automatic Grade Retrieval:** The bot automatically logs in and fetches the user's grades from the faculty portal, sending the results directly to the user in a private message.
+- **Automatic Grade Retrieval:** The app automatically logs in and fetches the user's grades from the faculty portal, sending the results directly to the user in a private message.
 
 - **Semester Selection:** Users can select different semesters to view grades from previous terms. The current semester is selected by default, but users have the flexibility to choose any other available semester.
 
-- **Heavy Load Mode:** When faculty servers are under heavy load, this mode reduces the number of HTTP requests by fetching only the final grades from the courses registration page. While it shows fewer details, it is particularly useful when waiting for final grades.
+- **Heavy Load Mode:** When faculty servers are under heavy load, this mode reduces the number of HTTP requests by fetching only the final grades from the courses registration page. While it shows fewer details, it is particularly useful when awaiting final course grades.
 
 - **Refresh Functionality:** Users can manually refresh the grades data to check for updates based on the current semester and load selection.
 
-- **Session Persistence:** The bot uses a `CookieContainer` to manage session cookies. This allows the bot to maintain a session across multiple requests without needing to log in repeatedly, saving network resources and reducing the time taken to fetch grades.
+- **Session Persistence:** The app uses a `CookieContainer` to manage session cookies. This allows it to maintain a session across multiple requests without needing to log in repeatedly, saving network resources and reducing the time taken to fetch grades.
 
-- **Retry Mechanism:** Given the frequent downtimes of the faculty website, the bot employs a retry mechanism to ensure reliable grade retrieval. If a request fails, the bot will retry up to 10 times, with the delay between retries increasing exponentially. It starts with a 3-second delay and increases to a maximum of 30 seconds.
+- **Retry Mechanism:** Given the frequent downtimes of the faculty website, the app employs a retry mechanism to ensure reliable grade retrieval. If a request fails, the bot will retry up to 10 times, with the delay between retries increasing exponentially. It starts with a 3-second delay and increases to a maximum of 30 seconds.
 
 ## How It Works
 
-- **Fetching Grades:** The bot fetches grades by navigating to the relevant pages on the faculty portal. Depending on the load selection specified by the user, it either fetches detailed grades (Normal Load) or only the final grades (Heavy Load).
+- **Fetching Grades:** The bot fetches grades by navigating to the relevant pages on the faculty portal. Depending on the load selection specified by the user, it either fetches detailed grades (Normal Load) or only the final course grades (Heavy Load).
 
-- **Error Handling:** The bot provides feedback if the login fails due to incorrect credentials or if the faculty server is down. In the event of a failure, it retries the process using the built-in retry mechanism.
+- **Error Handling:** The app provides feedback if the login fails due to incorrect credentials or if the faculty server is down. In the event of a failure, it retries the process using the built-in retry mechanism.
 
 ## Setup Instructions
 
-### 1. **Create a Discord Bot:**
+### 1. **Create a Discord App**
 
 - Create a new application from the [Discord Developer Portal](https://discord.com/developers/applications).
 
