@@ -8,7 +8,7 @@ namespace Grade_Monitor.Configuration;
 
 public class ConfigurationManager(string configFilePath)
 {
-    private readonly JsonSerializerSettings _jsonSettings = new() { ContractResolver = new CamelCasePropertyNamesContractResolver(), Formatting = Formatting.Indented };
+    private readonly JsonSerializerSettings _jsonSettings = new() { Formatting = Formatting.Indented };
     public Configuration Load()
     {
         if (!File.Exists(configFilePath))
