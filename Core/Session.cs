@@ -11,22 +11,21 @@ using Grade_Monitor.Utilities;
 
 namespace Grade_Monitor.Core;
 
-internal partial class Session(string studentId, string password)
+internal partial class Session(User user)
 {
-    [GeneratedRegex(@"\b(Fall|Spring|Summer) \d{4}\b")] private static partial Regex SemestersRegex();
+    [GeneratedRegex(@"\b(Fall|Spring|Summer) \d{4}\b")] private static partial Regex SemesterRegex(); // Regular expression to identify semester names
 
-    internal string StudentId = studentId;
-    internal string Cgpa;
-    internal string RequestedSemester;
+    internal User User = user;
 
-    private string _studentCourses;
-    private string _currentSemester;
+    internal string Cgpa; // User's CGPA, fetched from the dashboard
+    internal string RequestedSemester; // The semester the user has selected
 
-    internal HashSet<string> Semesters = [];
+    private string _studentCourses; // The 'Student Courses' page source
+    private string _currentSemester; // The name of the current semester
 
-    internal int Fails;
+    internal int Fails; // Fail counter
 
-    internal bool HeavyLoad;
+    internal bool HeavyLoad; // Indicates load type to determine if it will fetch detailed grades or only final grades for faster retrieval
 
     private static readonly CookieContainer CookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
     private readonly HttpClient _httpClient = new(new HttpClientHandler { UseProxy = false, CookieContainer = CookieContainer })
@@ -46,12 +45,14 @@ internal partial class Session(string studentId, string password)
         _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
         // For each semester the student took a course during
-        foreach (Match semester in SemestersRegex().Matches(_studentCourses))
+        foreach (Match semester in SemesterRegex().Matches(_studentCourses))
         {
-            // Add the semester to the configuration
-            if (Semesters.Add(semester.Value) && Program.Configuration.Semesters.All(s => s.Name != semester.Value))
+            var semesterName = semester.Value;
+
+            // Add semester to user's semesters
+            if (!User.Semesters.ContainsKey(semesterName))
             {
-                Program.Configuration.Semesters.Add(new Semester { Name = semester.Value, Courses = [] });
+                User.Semesters[semesterName] = [];
             }
         }
 
@@ -77,8 +78,6 @@ internal partial class Session(string studentId, string password)
 
     private async Task RefreshUrls(Dictionary<string, string> courses)
     {
-        var coursesHashSetUpdated = false;
-        
         if (_currentSemester == RequestedSemester)
         {
             // Read all courses
@@ -89,11 +88,14 @@ internal partial class Session(string studentId, string password)
             foreach (var line in myCourses.Split('\n').Where(line => line.Contains(_currentSemester)))
             {
                 var courseName = line.ExtractBetween(">", " (");
-                var courseUrl = line.ExtractBetween("\"", "\"");
+                var courseUrl = line.ExtractBetween("\"", "?");
 
                 AddCourse(_currentSemester, courseName, courseUrl);
 
-                courses[courseName] = courseUrl;
+                if (courses != null)
+                {
+                    courses[courseName] = courseUrl;
+                }
             }
         }
         else
@@ -115,7 +117,7 @@ internal partial class Session(string studentId, string password)
 
                     AddCourse(courseSemester, courseName, courseUrl);
 
-                    if (courseSemester == RequestedSemester)
+                    if (courses != null && courseSemester == RequestedSemester)
                     {
                         courses[courseName] = courseUrl;
                     }
@@ -131,33 +133,14 @@ internal partial class Session(string studentId, string password)
 
         void AddCourse(string courseSemester, string courseName, string courseUrl)
         {
-            foreach (var semester in Program.Configuration.Semesters)
-            {
-                if (semester.Name == courseSemester)
-                {
-                    // Remove course old data
-                    foreach (var course in semester.Courses)
-                    {
-                        if (course.Name == courseName)
-                        {
-                            semester.Courses.Remove(course);
-                            break;
-                        }
-                    }
-
-                    // Add new course data
-                    semester.Courses.Add(new Course { Name = courseName, Url = courseUrl });
-                    coursesHashSetUpdated = true;
-                    return;
-                }
-            }
+            User.Semesters[courseSemester].Add(courseName);
+            
+            Program.Configuration.Courses[courseName] = courseUrl;
         }
 
-        if (coursesHashSetUpdated)
-        {
-            Program.ConfigurationManager.Save(Program.Configuration);
-        }
+        Program.ConfigurationManager.Save(Program.Configuration);
     }
+
     internal async Task<SortedDictionary<string, string>> FetchGradesReport(bool fetchUrls = false)
     {
         if (!HeavyLoad)
@@ -167,20 +150,33 @@ internal partial class Session(string studentId, string password)
                 // Check first if the semester's courses were already saved before
                 // If user has withdrawn/dropped/added courses, they must use the slash command again
                 var courses = new Dictionary<string, string>();
-                foreach (var semester in Program.Configuration.Semesters)
+                var refreshRequired = false;
+                foreach (var semester in User.Semesters)
                 {
-                    if (semester.Name == RequestedSemester)
+                    if (semester.Key == RequestedSemester)
                     {
-                        foreach (var course in semester.Courses)
+                        foreach (var course in semester.Value)
                         {
-                            courses[course.Name] = course.Url;
+                            if (!Program.Configuration.Courses.TryGetValue(course, out var result))
+                            {
+                                refreshRequired = true;
+                                break;
+                            }
+
+                            courses[course] = result;
+                        }
+
+                        if (refreshRequired)
+                        {
+                            break;
                         }
                     }
                 }
 
                 // If no courses stored, fetch them
-                if (courses.Count == 0)
+                if (courses.Count == 0 || refreshRequired)
                 {
+                    courses.Clear();
                     await RefreshUrls(courses).ConfigureAwait(false);
                 }
 
@@ -247,9 +243,9 @@ internal partial class Session(string studentId, string password)
             }
         }
 
-        return FetchFinalGrades();
+        return FetchOnlyFinalGrades();
     }
-    private SortedDictionary<string, string> FetchFinalGrades()
+    private SortedDictionary<string, string> FetchOnlyFinalGrades()
     {
         var grades = new SortedDictionary<string, string>();
 
@@ -267,7 +263,7 @@ internal partial class Session(string studentId, string password)
 
                 grades[$"{courseCode}: {courseName}"] = $"||**__Course Grade: {courseGrade}__**||";
 
-                i += 40;
+                i += 40; // The distance between each line we need to read is 40 lines
             }
             else
             {
@@ -289,8 +285,8 @@ internal partial class Session(string studentId, string password)
 
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                { "email", $"{StudentId}@eng.asu.edu.eg" },
-                { "password", password },
+                { "email", $"{User.StudentId}@eng.asu.edu.eg" },
+                { "password", User.Password },
                 { "_token", html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false) } // Extract token
             });
 
@@ -309,6 +305,8 @@ internal partial class Session(string studentId, string password)
             {
                 throw new Exception($"Login Error: {response.ReasonPhrase}");
             }
+
+            Program.WriteLog("Logged in successfully..", ConsoleColor.Magenta);
         }
         else
         {

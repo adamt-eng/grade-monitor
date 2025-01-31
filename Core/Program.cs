@@ -30,7 +30,7 @@ internal class Program
         // Load configuration
         ConfigurationManager = new ConfigurationManager("config.json");
         Configuration = ConfigurationManager.Load();
-        
+
         // Log event handler
         Client.Log += message =>
         {
@@ -51,21 +51,26 @@ internal class Program
             var discordUserId = socketSlashCommand.User.Id;
 
             // Save new user
-            var user = Configuration.User;
-            user.DiscordUserId = discordUserId;
-            user.StudentId = studentId;
-            user.Password = password;
+            var user = new User
+            {
+                DiscordUserId = discordUserId,
+                StudentId = studentId,
+                Password = password
+            };
 
             // Clear stored semester data to force the application to refetch them
             // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
             // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
-            Configuration.Semesters.Clear();
+            user.Semesters.Clear();
+
+            // Add user to configuration
+            Configuration.Users.Add(user);
 
             // Update config.json
             ConfigurationManager.Save(Configuration);
 
             // Initialize new session and store it
-            Sessions[discordUserId] = new Session(studentId: studentId, password: password);
+            Sessions[discordUserId] = new Session(user: user);
 
             GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted");
 
@@ -139,15 +144,13 @@ internal class Program
 
                     UpdateTimestamp();
 
-                    var user = Configuration.User;
-
-                    if (user != null)
+                    foreach (var user in Configuration.Users)
                     {
                         var discordUserId = user.DiscordUserId;
 
                         if (!Sessions.ContainsKey(discordUserId))
                         {
-                            Sessions[discordUserId] = new Session(studentId: user.StudentId, password: user.Password);
+                            Sessions[discordUserId] = new Session(user: user);
                         }
 
                         GetGrades(discordUserId, sender == null ? "Ready" : "OnTimerElapsed");
@@ -261,13 +264,13 @@ internal class Program
 
                     var embedBuilder = new EmbedBuilder
                     {
-                        Title = $"Grades Report For {session.StudentId}",
+                        Title = $"Grades Report For {session.User.StudentId}",
                         Description = $"**||__Cumulative GPA: {session.Cgpa}__||**",
                         Timestamp = DateTime.Now,
                         Fields = embedFieldBuilders
                     };
 
-                    var components = GenerateComponentBuilder(session.Semesters, session.RequestedSemester, session.HeavyLoad);
+                    var components = GenerateComponentBuilder(session.User.Semesters.Keys.ToHashSet(), session.RequestedSemester, session.HeavyLoad);
 
                     // If the call was from the timer and the embeds are identical (aka; grades not changed)
                     // Or if the user changed their selection of semester or load
