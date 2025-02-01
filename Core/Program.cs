@@ -72,7 +72,7 @@ internal class Program
             // Initialize new session and store it
             Sessions[discordUserId] = new Session(user: user);
 
-            GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted");
+            await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
 
             await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
         };
@@ -106,39 +106,23 @@ internal class Program
                     }
             }
 
-            GetGrades(discordUserId: discordUserId, interactionType: $"SelectMenuExecuted ({customId})");
+            await GetGrades(discordUserId: discordUserId, interactionType: $"SelectMenuExecuted ({customId})").ConfigureAwait(false);
         };
 
         Client.ButtonExecuted += async socketMessageComponent =>
         {
             // Acknowledge this interaction
             await socketMessageComponent.DeferAsync(ephemeral: true).ConfigureAwait(false);
-            GetGrades(discordUserId: socketMessageComponent.User.Id, interactionType: "ButtonExecuted");
+            await GetGrades(discordUserId: socketMessageComponent.User.Id, interactionType: "ButtonExecuted").ConfigureAwait(false);
         };
 
-        Client.Ready += async () =>
+        Client.Ready += () =>
         {
-            var guild = Client.Guilds.First();
-
-            if ((await guild.GetApplicationCommandsAsync().ConfigureAwait(false)).All(command => command.Name != "get-grades"))
-            {
-                await guild.CreateApplicationCommandAsync(new SlashCommandBuilder
-                {
-                    Name = "get-grades",
-                    Description = "Get your grades.",
-                    Options =
-                    {
-                        new SlashCommandOptionBuilder { Name = "student-id", Description = "Student ID", Type = ApplicationCommandOptionType.String, IsRequired = true },
-                        new SlashCommandOptionBuilder { Name = "password", Description = "Password", Type = ApplicationCommandOptionType.String, IsRequired = true }
-                    }
-                }.Build()).ConfigureAwait(false);
-            }
-
             if (!botInitialized)
             {
                 botInitialized = true;
 
-                static void OnTimerElapsed(object sender, ElapsedEventArgs e)
+                static async void OnTimerElapsed(object sender, ElapsedEventArgs e)
                 {
                     Timer.Interval = Configuration.TimerIntervalInMinutes * 60000;
 
@@ -153,7 +137,7 @@ internal class Program
                             Sessions[discordUserId] = new Session(user: user);
                         }
 
-                        GetGrades(discordUserId, sender == null ? "Ready" : "OnTimerElapsed");
+                        await GetGrades(discordUserId, sender == null ? "Ready" : "OnTimerElapsed").ConfigureAwait(false);
                     }
                 }
 
@@ -162,6 +146,8 @@ internal class Program
                 Timer.Elapsed += OnTimerElapsed;
                 Timer.Start();
             }
+
+            return Task.CompletedTask;
         };
 
         await Client.LoginAsync(TokenType.Bot, Configuration.BotToken).ConfigureAwait(false);
@@ -181,7 +167,7 @@ internal class Program
         Console.WriteLine($"{DateTime.Now:dd/MM/yyyy HH:mm:ss} {log}");
         Console.ResetColor();
     }
-    private static async void GetGrades(ulong discordUserId, string interactionType)
+    private static async Task GetGrades(ulong discordUserId, string interactionType)
     {
         try
         {
