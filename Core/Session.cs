@@ -27,17 +27,8 @@ internal partial class Session(User user)
 
     internal bool HeavyLoad; // Indicates load type to determine if it will fetch detailed grades or only final grades for faster retrieval
 
-    private static readonly CookieContainer CookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
-    private readonly HttpClient _httpClient = new(new HttpClientHandler { UseProxy = false, CookieContainer = CookieContainer })
-    {
-        DefaultRequestHeaders =
-        {
-            {
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-            }
-        }
-    };
+    private readonly CookieContainer _cookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
+    private HttpClient _httpClient;
 
     internal async Task InitializeMembers(IUserMessage message)
     {
@@ -75,7 +66,6 @@ internal partial class Session(User user)
             }
         }
     }
-
     private async Task RefreshUrls(Dictionary<string, string> courses)
     {
         if (_currentSemester == RequestedSemester)
@@ -140,7 +130,6 @@ internal partial class Session(User user)
 
         Program.ConfigurationManager.Save(Program.Configuration);
     }
-
     internal async Task<SortedDictionary<string, string>> FetchGradesReport(bool fetchUrls = false)
     {
         if (!HeavyLoad)
@@ -275,6 +264,17 @@ internal partial class Session(User user)
     }
     internal async Task<bool> Login()
     {
+        _httpClient = new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer })
+        {
+            DefaultRequestHeaders =
+            {
+                {
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+                }
+            }
+        };
+
         // Attempt to visit dashboard
         var html = await Program.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient).ConfigureAwait(false);
 
