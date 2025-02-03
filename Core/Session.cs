@@ -44,7 +44,7 @@ internal partial class Session(User user)
         };
 
         // Attempt to visit dashboard
-        var html = await Program.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient).ConfigureAwait(false);
+        var html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient).ConfigureAwait(false);
 
         // If the below condition is true, this indicates that user was redirected to login page because they're not logged in
         if (html.Contains("login"))
@@ -88,7 +88,7 @@ internal partial class Session(User user)
 
     internal async Task InitializeMembers(IUserMessage message)
     {
-        _studentCourses = await Program.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient).ConfigureAwait(false);
+        _studentCourses = await HttpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient).ConfigureAwait(false);
         _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
         // Store the name of each semester the student took a course during
@@ -172,7 +172,7 @@ internal partial class Session(User user)
             {
                 var gradeDetails = new List<string>();
 
-                var htmlLines = (await Program.FetchPage(course.Value, _httpClient).ConfigureAwait(false)).Split('\n');
+                var htmlLines = (await HttpHelper.FetchPage(course.Value, _httpClient).ConfigureAwait(false)).Split('\n');
                 var filteredHtmlLines = htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
 
                 // This case can occur when the link for the course is updated and the saved one now redirects
@@ -181,7 +181,7 @@ internal partial class Session(User user)
                 if (filteredHtmlLines.Count == 0)
                 {
                     await RefreshCoursesUrls(courses).ConfigureAwait(false);
-                    htmlLines = (await Program.FetchPage(courses[course.Key], _httpClient).ConfigureAwait(false)).Split('\n');
+                    htmlLines = (await HttpHelper.FetchPage(courses[course.Key], _httpClient).ConfigureAwait(false)).Split('\n');
                     filteredHtmlLines = htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
                 }
 
@@ -265,7 +265,7 @@ internal partial class Session(User user)
         if (_currentSemester == RequestedSemester)
         {
             // Read my_courses page HTML and transform the page into an array with each line as an element
-            var myCourses = (await Program.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient).ConfigureAwait(false)).Split('\n');
+            var myCourses = (await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient).ConfigureAwait(false)).Split('\n');
 
             // Filter the array to only contain the relevant courses
             myCourses = (string[])myCourses.Where(line => line.Contains(_currentSemester));
