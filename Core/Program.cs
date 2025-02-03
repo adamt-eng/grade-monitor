@@ -14,6 +14,8 @@ namespace Grade_Monitor.Core;
 internal class Program
 {
     private static readonly Timer Timer = new();
+    
+    private static readonly Random Random = new();
 
     private static readonly Dictionary<ulong, Session> Sessions = [];
 
@@ -115,25 +117,35 @@ internal class Program
 
         Client.Ready += () =>
         {
-            static async void OnTimerElapsed(object sender, ElapsedEventArgs e)
+            var interval = Configuration.TimerIntervalInMinutes * 60;
+            
+            async void OnTimerElapsed(object sender, ElapsedEventArgs e)
             {
-                Timer.Interval = Configuration.TimerIntervalInMinutes * 60000;
-
                 foreach (var user in Configuration.Users)
                 {
                     var discordUserId = user.DiscordUserId;
 
-                    if (!Sessions.ContainsKey(discordUserId))
+                    if (!Sessions.TryGetValue(discordUserId, out var session))
                     {
-                        Sessions[discordUserId] = new Session(user: user);
+                        var timer = Random.Next(0, interval);
+
+                        session = new Session(user: user) { Timer = timer };
+                        Sessions[discordUserId] = session;
+
+                        WriteLog($"{discordUserId}: Created session, starting monitoring in {timer} seconds.", ConsoleColor.Cyan);
                     }
 
-                    await GetGrades(discordUserId, "OnTimerElapsed").ConfigureAwait(false);
+                    if (session.Timer == 0)
+                    {
+                        session.Timer = interval;
+                        await GetGrades(discordUserId, "OnTimerElapsed").ConfigureAwait(false);
+                    }
+
+                    --session.Timer;
                 }
             }
 
-            OnTimerElapsed(null, null);
-
+            Timer.Interval = 1000;
             Timer.Elapsed += OnTimerElapsed;
             Timer.Start();
 
@@ -145,7 +157,7 @@ internal class Program
         await Task.Delay(-1).ConfigureAwait(false);
     }
 
-    private static string NextRefresh() => $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddMilliseconds(Timer.Interval)).ToUnixTimeSeconds()}:R> {new Emoji("🕒")}";
+    private static string NextRefresh(double intervalInSeconds) => $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddSeconds(intervalInSeconds)).ToUnixTimeSeconds()}:R> {new Emoji("🕒")}";
 
     internal static void WriteLog(string log, ConsoleColor consoleColor)
     {
@@ -162,7 +174,7 @@ internal class Program
             Console.WriteLine();
 
             // Log interaction
-            WriteLog($"{interactionType} {discordUserId}", ConsoleColor.Cyan);
+            WriteLog($"{discordUserId}: {interactionType}", ConsoleColor.Cyan);
 
             // Stopwatch to keep track of how fast we're reading grades
             var stopwatch = new Stopwatch();
@@ -221,7 +233,7 @@ internal class Program
                     var gradesReport = await session.FetchGradesReport().ConfigureAwait(false);
 
                     stopwatch.Stop();
-                    WriteLog($"Elapsed time: {stopwatch.ElapsedMilliseconds}ms", ConsoleColor.Yellow);
+                    WriteLog($"{discordUserId}: Elapsed time: {stopwatch.ElapsedMilliseconds}ms", ConsoleColor.Yellow);
 
                     // Loops on each grade, the key is the course name and the value is the course's grade details
                     // Adds an EmbedFieldBuilder with each course data to a list
@@ -258,7 +270,7 @@ internal class Program
 
                         void Update(MessageProperties properties)
                         {
-                            properties.Content = NextRefresh();
+                            properties.Content = NextRefresh(session.Timer);
                             properties.Embed = embedBuilder.Build();
                             properties.Components = components;
                         }
@@ -274,7 +286,7 @@ internal class Program
                             await message.DeleteAsync().ConfigureAwait(false);
                         }
 
-                        await user.SendMessageAsync(text: NextRefresh(), embed: embedBuilder.Build(), components: components).ConfigureAwait(false);
+                        await user.SendMessageAsync(text: NextRefresh(session.Timer), embed: embedBuilder.Build(), components: components).ConfigureAwait(false);
                     }
 
                     // Reset fails counter
@@ -287,14 +299,14 @@ internal class Program
             }
             catch (Exception exception)
             {
-                WriteLog($"Exception 1: {exception}", ConsoleColor.Red);
+                WriteLog($"{discordUserId}: Exception 1: {exception.Message}", ConsoleColor.Red);
 
                 // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
-                Timer.Interval = Configuration.TimerIntervalAfterExceptionsInMinutes * 60000;
+                session.Timer = Configuration.TimerIntervalAfterExceptionsInMinutes * 60;
 
                 // Tracking the fails count allows us to track how long the faculty server has been down
                 ++session.Fails;
-                var text = $"{NextRefresh()}🔂 ({session.Fails})";
+                var text = $"{NextRefresh(session.Timer)}🔂 ({session.Fails})";
 
                 if (message != null)
                 {
@@ -308,7 +320,7 @@ internal class Program
         }
         catch (Exception exception)
         {
-            WriteLog($"Exception 2: {exception}", ConsoleColor.Red);
+            WriteLog($"{discordUserId}: Exception 2: {exception.Message}", ConsoleColor.Red);
         }
     }
 }
