@@ -14,7 +14,7 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 
 - **Session Persistence:** The app uses a `CookieContainer` to manage session cookies. This allows it to maintain a session across multiple requests without needing to log in repeatedly, saving network resources and reducing the time taken to fetch grades.
 
-- **Retry Mechanism:** Given the frequent downtimes of the faculty website, the app employs a retry mechanism to ensure reliable grade retrieval. If a request fails, the bot will retry up to 10 times, with the delay between retries increasing exponentially. It starts with a 3-second delay and increases to a maximum of 30 seconds.
+- **Retry Mechanism:** Given the frequent downtimes of the faculty website, the app employs a retry mechanism to ensure reliable grade retrieval. If a request fails, the app will use a shorter refresh interval to check for grades more frequently so that we're able to fetch grades as soon as the server is back up.
 
 ## How It Works
 
