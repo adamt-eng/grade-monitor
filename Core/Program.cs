@@ -14,10 +14,10 @@ namespace Grade_Monitor.Core;
 
 internal class Program
 {
-    private static string _nextRefresh = string.Empty;
     private static readonly Timer Timer = new();
 
     private static readonly Dictionary<ulong, Session> Sessions = [];
+
     private static readonly DiscordSocketClient Client = new(new DiscordSocketConfig { GatewayIntents = GatewayIntents.AllUnprivileged & ~GatewayIntents.GuildScheduledEvents & ~GatewayIntents.GuildInvites });
 
     internal static ConfigurationManager ConfigurationManager;
@@ -25,8 +25,6 @@ internal class Program
 
     private static async Task Main()
     {
-        var botInitialized = false;
-
         // Load configuration
         ConfigurationManager = new ConfigurationManager("config.json");
         Configuration = ConfigurationManager.Load();
@@ -118,34 +116,27 @@ internal class Program
 
         Client.Ready += () =>
         {
-            if (!botInitialized)
+            static async void OnTimerElapsed(object sender, ElapsedEventArgs e)
             {
-                botInitialized = true;
+                Timer.Interval = Configuration.TimerIntervalInMinutes * 60000;
 
-                static async void OnTimerElapsed(object sender, ElapsedEventArgs e)
+                foreach (var user in Configuration.Users)
                 {
-                    Timer.Interval = Configuration.TimerIntervalInMinutes * 60000;
+                    var discordUserId = user.DiscordUserId;
 
-                    UpdateTimestamp();
-
-                    foreach (var user in Configuration.Users)
+                    if (!Sessions.ContainsKey(discordUserId))
                     {
-                        var discordUserId = user.DiscordUserId;
-
-                        if (!Sessions.ContainsKey(discordUserId))
-                        {
-                            Sessions[discordUserId] = new Session(user: user);
-                        }
-
-                        await GetGrades(discordUserId, sender == null ? "Ready" : "OnTimerElapsed").ConfigureAwait(false);
+                        Sessions[discordUserId] = new Session(user: user);
                     }
+
+                    await GetGrades(discordUserId, "OnTimerElapsed").ConfigureAwait(false);
                 }
-
-                OnTimerElapsed(null, null);
-
-                Timer.Elapsed += OnTimerElapsed;
-                Timer.Start();
             }
+
+            OnTimerElapsed(null, null);
+
+            Timer.Elapsed += OnTimerElapsed;
+            Timer.Start();
 
             return Task.CompletedTask;
         };
@@ -154,19 +145,16 @@ internal class Program
         await Client.StartAsync().ConfigureAwait(false);
         await Task.Delay(-1).ConfigureAwait(false);
     }
-    private static void UpdateTimestamp()
-    {
-        var offset = 10; // Usually takes 10 seconds to read grades
-        var nextRefresh = ((DateTimeOffset)DateTime.Now.AddMilliseconds(Timer.Interval).AddSeconds(offset)).ToUnixTimeSeconds();
 
-        _nextRefresh = $"Next refresh <t:{nextRefresh}:R> {new Emoji("🕒")}";
-    }
+    private static string NextRefresh() => $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddMilliseconds(Timer.Interval)).ToUnixTimeSeconds()}:R> {new Emoji("🕒")}";
+
     internal static void WriteLog(string log, ConsoleColor consoleColor)
     {
         Console.ForegroundColor = consoleColor;
         Console.WriteLine($"{DateTime.Now:dd/MM/yyyy HH:mm:ss} {log}");
         Console.ResetColor();
     }
+
     private static async Task GetGrades(ulong discordUserId, string interactionType)
     {
         try
@@ -181,6 +169,7 @@ internal class Program
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
+            // Get the DM channel between the user and the bot
             var user = await Client.GetUserAsync(discordUserId).ConfigureAwait(false);
             var dmChannel = await user.CreateDMChannelAsync().ConfigureAwait(false);
             var messages = (await dmChannel.GetMessagesAsync().FlattenAsync().ConfigureAwait(false)).ToList();
@@ -209,7 +198,7 @@ internal class Program
 
             // message will be null only if one of two things happened:
             // 1. An error has occurred while logging in or accessing faculty site
-            // 2. There was more than one message in the DM channel (not supposed to happen except due to misusage of the app
+            // 2. There was more than one message in the DM channel (not supposed to happen except due to misusage of the app)
             if (message == null)
             {
                 // Delete all messages in the DM channel
@@ -218,7 +207,7 @@ internal class Program
                     await item.DeleteAsync().ConfigureAwait(false);
                 }
             }
-            // If message was null, a new message is sent regardless of whether the grades were updated
+            // If message was null, a new message is sent regardless of if the grades were updated
 
             // Get specified user session
             var session = Sessions[discordUserId];
@@ -256,18 +245,21 @@ internal class Program
                         Fields = embedFieldBuilders
                     };
 
-                    var components = GenerateComponentBuilder(session.User.Semesters.Keys.ToHashSet(), session.RequestedSemester, session.HeavyLoad);
+                    var components = DiscordHelper.CreateMessageComponent(session.User.Semesters.Keys.ToHashSet(), session.RequestedSemester, session.HeavyLoad);
 
-                    // If the call was from the timer and the embeds are identical (aka; grades not changed)
+                    // If the call was from the timer and the embeds are identical (grades not changed)
                     // Or if the user changed their selection of semester or load
-                    if (message != null && (interactionType.Contains("SelectMenuExecuted") || interactionType == "OnTimerElapsed" && embedBuilder.IdenticalTo(previousEmbedBuilder)))
+                    // Therefore, simply update the already sent message with the requested data
+                    if (message != null &&
+                        (interactionType.Contains("SelectMenuExecuted") ||
+                         interactionType == "OnTimerElapsed" && embedBuilder.IdenticalTo(previousEmbedBuilder)))
                     {
                         // Silently update the timestamp in the already sent message to indicate that the app is functioning as expected
                         await message.ModifyAsync(Update).ConfigureAwait(false);
 
                         void Update(MessageProperties properties)
                         {
-                            properties.Content = _nextRefresh;
+                            properties.Content = NextRefresh();
                             properties.Embed = embedBuilder.Build();
                             properties.Components = components;
                         }
@@ -283,7 +275,7 @@ internal class Program
                             await message.DeleteAsync().ConfigureAwait(false);
                         }
 
-                        await user.SendMessageAsync(text: _nextRefresh, embed: embedBuilder.Build(), components: components).ConfigureAwait(false);
+                        await user.SendMessageAsync(text: NextRefresh(), embed: embedBuilder.Build(), components: components).ConfigureAwait(false);
                     }
 
                     // Reset fails counter
@@ -291,20 +283,19 @@ internal class Program
                 }
                 else
                 {
-                    await user.SendMessageAsync(text: "`Incorrect Student ID or Password.`", components: new ComponentBuilder().WithButton(RefreshButton()).Build()).ConfigureAwait(false);
+                    await user.SendMessageAsync(text: "`Incorrect Student ID or Password.`", components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
                 }
             }
             catch (Exception exception)
             {
-                WriteLog($"Exception: {exception}", ConsoleColor.Red);
+                WriteLog($"Exception 1: {exception}", ConsoleColor.Red);
 
+                // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
                 Timer.Interval = Configuration.TimerIntervalAfterExceptionsInMinutes * 60000;
 
-                UpdateTimestamp();
-
-                session.Fails++;
-
-                var text = $"{_nextRefresh}🔂 ({session.Fails})";
+                // Tracking the fails count allows us to track how long the faculty server has been down
+                ++session.Fails;
+                var text = $"{NextRefresh()}🔂 ({session.Fails})";
 
                 if (message != null)
                 {
@@ -312,103 +303,13 @@ internal class Program
                 }
                 else
                 {
-                    await user.SendMessageAsync(text: $"{text}\n\n`Faculty server is currently down.`", components: new ComponentBuilder().WithButton(RefreshButton()).Build()).ConfigureAwait(false);
+                    await user.SendMessageAsync(text: $"{text}\n\n`Faculty server is currently down.`", components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
                 }
             }
         }
-        catch { }
-    }
-
-    private static ButtonBuilder RefreshButton() => new ButtonBuilder().WithLabel("Refresh").WithStyle(ButtonStyle.Secondary).WithEmote(new Emoji("\ud83d\udd04")).WithCustomId("refresh");
-
-    private static MessageComponent GenerateComponentBuilder(HashSet<string> semesters, string requestedSemester, bool heavyLoad)
-    {
-        var selectSemesterMenuOptions = new List<SelectMenuOptionBuilder>();
-
-        foreach (var semester in semesters)
+        catch (Exception exception)
         {
-            selectSemesterMenuOptions.Add(new SelectMenuOptionBuilder
-            {
-                Label = semester,
-                Value = semester,
-                Emote = semester.Contains("Summer") ? new Emoji("☀️") : semester.Contains("Spring") ? new Emoji("🌸") : new Emoji("🍂"),
-                IsDefault = semester == requestedSemester
-            });
+            WriteLog($"Exception 2: {exception}", ConsoleColor.Red);
         }
-
-        var selectSemesterMenu = new SelectMenuBuilder
-        {
-            CustomId = "select-semester",
-            MinValues = 1,
-            MaxValues = 1,
-            Options = selectSemesterMenuOptions
-        };
-
-        var selectLoadMenu = new SelectMenuBuilder
-        {
-            CustomId = "select-load",
-            MinValues = 1,
-            MaxValues = 1,
-            Options =
-            [
-                new SelectMenuOptionBuilder
-                {
-                    Label = "Heavy Load",
-                    Value = "Heavy Load",
-                    Description = "Use when faculty servers are under heavy load",
-                    Emote = new Emoji("\ud83d\udd34"),
-                    IsDefault = heavyLoad
-                },
-                new SelectMenuOptionBuilder
-                {
-                    Label = "Normal Load",
-                    Value = "Normal Load",
-                    Description = "Use for detailed course grades",
-                    Emote = new Emoji("\ud83d\udfe2"),
-                    IsDefault = !heavyLoad
-                }
-            ]
-        };
-
-        return new ComponentBuilder
-        {
-            ActionRows =
-            [
-                new ActionRowBuilder().WithSelectMenu(selectSemesterMenu),
-                new ActionRowBuilder().WithSelectMenu(selectLoadMenu),
-                new ActionRowBuilder().WithButton(RefreshButton())
-            ]
-        }.Build();
-    }
-    internal static async Task<string> FetchPage(string url, HttpClient httpClient)
-    {
-        var retryCount = 10;
-        var retryDelay = 3000;
-        var attempt = 0;
-
-        while (attempt < retryCount)
-        {
-            try
-            {
-                WriteLog(url, ConsoleColor.DarkGreen);
-                using var response = await httpClient.GetAsync(url).ConfigureAwait(false);
-                return response.IsSuccessStatusCode ? await response.Content.ReadAsStringAsync().ConfigureAwait(false) : throw new Exception(response.ReasonPhrase);
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"Exception thrown: {ex.Message}", ConsoleColor.Red);
-
-                attempt++;
-
-                if (attempt == retryCount)
-                {
-                    throw new Exception($"Failed to fetch page after {attempt} attempts. Last error: {ex.Message}", ex);
-                }
-
-                await Task.Delay(retryDelay * attempt).ConfigureAwait(false);
-            }
-        }
-
-        throw new Exception("Unreachable Code.");
     }
 }
