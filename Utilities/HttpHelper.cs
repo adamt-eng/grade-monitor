@@ -13,7 +13,7 @@ internal static class HttpHelper
         {
             Program.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
             using var response = await httpClient.GetAsync(url).ConfigureAwait(false);
-            return response.IsSuccessStatusCode ? await response.Content.ReadAsStringAsync().ConfigureAwait(false) : throw new Exception(response.ReasonPhrase);
+            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }
         catch (Exception)
         {
