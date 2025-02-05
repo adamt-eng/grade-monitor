@@ -15,8 +15,6 @@ internal class Program
 {
     private static readonly Timer Timer = new();
     
-    private static readonly Random Random = new();
-
     private static readonly Dictionary<ulong, Session> Sessions = [];
 
     private static readonly DiscordSocketClient Client = new(new DiscordSocketConfig { GatewayIntents = GatewayIntents.AllUnprivileged & ~GatewayIntents.GuildScheduledEvents & ~GatewayIntents.GuildInvites });
@@ -121,13 +119,24 @@ internal class Program
             
             async void OnTimerElapsed(object sender, ElapsedEventArgs e)
             {
+                // Get user count
+                var userCount = Configuration.Users.Count;
+
+                // Divide the total interval specified in the configuration by the user count
+                // This will give us the time that is between each user's auto-refresh request
+                // This makes sure that the auto-refresh requests are as far away as possible from each other
+                var intervalPerUser = interval / userCount;
+
+                // Track user index
+                var index = 0;
+
                 foreach (var user in Configuration.Users)
                 {
                     var discordUserId = user.DiscordUserId;
 
                     if (!Sessions.TryGetValue(discordUserId, out var session))
                     {
-                        var timer = Random.Next(0, interval);
+                        var timer = intervalPerUser * index;
 
                         session = new Session(user: user) { Timer = timer };
                         Sessions[discordUserId] = session;
@@ -142,6 +151,8 @@ internal class Program
                     }
 
                     --session.Timer;
+
+                    ++index;
                 }
             }
 
