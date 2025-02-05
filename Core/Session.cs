@@ -34,7 +34,7 @@ internal partial class Session(User user)
 
     internal async Task<bool> Login()
     {
-        _httpClient = new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer })
+        _httpClient ??= new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer })
         {
             DefaultRequestHeaders =
             {
@@ -48,23 +48,31 @@ internal partial class Session(User user)
         // Attempt to visit dashboard
         var html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId).ConfigureAwait(false);
 
-        // If the below condition is true, this indicates that user was redirected to login page because they're not logged in
-        if (html.Contains("login"))
+        // If the below condition is true, this indicates that user was redirected because they're not logged in
+        if (!html.Contains("dashboard"))
         {
             Program.WriteLog($"{User.DiscordUserId}: No stored session, initiating login..", ConsoleColor.Red);
 
+            // Extract token
+            var token = html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false);
+
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                { "email", $"{User.StudentId}@eng.asu.edu.eg" },
-                { "password", User.Password },
-                { "_token", html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false) } // Extract token
+                { "email1", $"{User.StudentId}@eng.asu.edu.eg" },
+                { "password1", User.Password },
+                { "_token", token }
             });
 
-            using var response = await _httpClient.PostAsync("https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync("https://eng.asu.edu.eg/log1n", content).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
                 html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+                if (!html.Contains("dashboard"))
+                {
+                    throw new Exception("Login Error 1");
+                }
 
                 if (html.Contains("alert alert-danger"))
                 {
@@ -73,7 +81,7 @@ internal partial class Session(User user)
             }
             else
             {
-                throw new Exception($"Login Error: {response.ReasonPhrase}");
+                throw new Exception("Login Error 2");
             }
 
             Program.WriteLog($"{User.DiscordUserId}: Logged in successfully..", ConsoleColor.Magenta);
@@ -126,7 +134,7 @@ internal partial class Session(User user)
         }
     }
 
-    internal async Task<SortedDictionary<string, string>> FetchGradesReport(bool fetchUrls = false)
+    internal async Task<SortedDictionary<string, string>> FetchGradesReport()
     {
         if (HeavyLoad) return FetchOnlyFinalGrades();
 
