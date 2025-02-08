@@ -312,12 +312,19 @@ internal class Program
             {
                 WriteLog($"{discordUserId}: Exception 1: {exception.Message}", ConsoleColor.Red);
 
-                // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
-                session.Timer = Configuration.TimerIntervalAfterExceptionsInMinutes * 60;
-
                 // Tracking the fails count allows us to track how long the faculty server has been down
                 ++session.Fails;
                 var text = $"{NextRefresh(session.Timer)}🔂 ({session.Fails})";
+
+                if (exception.Message == "Filling questionnaire is required.")
+                {
+                    text += $" {exception.Message}";
+                }
+                else
+                {
+                    // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
+                    session.Timer = Configuration.TimerIntervalAfterExceptionsInMinutes * 60;
+                }
 
                 if (message != null)
                 {

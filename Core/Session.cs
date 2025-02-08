@@ -28,6 +28,7 @@ internal partial class Session(User user)
     internal int Fails; // Fail counter
 
     internal bool HeavyLoad; // Indicates load type to determine if it will fetch detailed grades or only final grades for faster retrieval
+    private bool CheckedFinalGrades; // Indicates whether or not we have checked for the final grades
 
     private readonly CookieContainer _cookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
     private HttpClient _httpClient;
@@ -49,7 +50,7 @@ internal partial class Session(User user)
         var html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId).ConfigureAwait(false);
 
         // If the below condition is true, this indicates that user was redirected because they're not logged in
-        if (!html.Contains("dashboard"))
+        if (!html.Contains("my_courses"))
         {
             Program.WriteLog($"{User.DiscordUserId}: No stored session, initiating login..", ConsoleColor.Red);
 
@@ -69,14 +70,20 @@ internal partial class Session(User user)
             {
                 html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-                if (!html.Contains("dashboard"))
+                if (!html.Contains("my_courses"))
                 {
-                    throw new Exception("Login Error 1");
-                }
-
-                if (html.Contains("alert alert-danger"))
-                {
-                    return false;
+                    if (html.Contains("Questionnaire"))
+                    {
+                        throw new Exception("Filling questionnaire is required.");
+                    }
+                    else if (html.Contains("alert alert-danger"))
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        throw new Exception("Login Error 1");
+                    }
                 }
             }
             else
@@ -92,7 +99,7 @@ internal partial class Session(User user)
         }
 
         // Extract CGPA from dashboard
-        Cgpa = html.ExtractBetween("white\">", "<", lastIndexOf: false);
+        Cgpa = html.ExtractBetween("\"text-white\">", "<", lastIndexOf: false);
         return true;
     }
 
@@ -136,7 +143,14 @@ internal partial class Session(User user)
 
     internal async Task<SortedDictionary<string, string>> FetchGradesReport()
     {
-        if (HeavyLoad) return FetchOnlyFinalGrades();
+        if (HeavyLoad && !CheckedFinalGrades)
+        {
+            return await FetchOnlyFinalGradesAsync().ConfigureAwait(false);
+        }
+        else
+        {
+            CheckedFinalGrades = false;
+        }
 
         try
         {
@@ -148,6 +162,8 @@ internal partial class Session(User user)
             {
                 if (semester.Key == RequestedSemester)
                 {
+                    if (semester.Value.Count == 0) break;
+
                     foreach (var course in semester.Value)
                     {
                         if (!Program.Configuration.Courses.TryGetValue(course, out var result))
@@ -159,10 +175,7 @@ internal partial class Session(User user)
                         courses[course] = result;
                     }
 
-                    if (refreshRequired)
-                    {
-                        break;
-                    }
+                    if (refreshRequired) break;
                 }
             }
 
@@ -234,10 +247,10 @@ internal partial class Session(User user)
             // FetchFinalGrades will get called
         }
 
-        return FetchOnlyFinalGrades();
+        return await FetchOnlyFinalGradesAsync().ConfigureAwait(false);
     }
 
-    private SortedDictionary<string, string> FetchOnlyFinalGrades()
+    private async Task<SortedDictionary<string, string>> FetchOnlyFinalGradesAsync()
     {
         var grades = new SortedDictionary<string, string>();
 
@@ -263,7 +276,14 @@ internal partial class Session(User user)
             }
         }
 
-        return grades;
+        switch (grades.Count)
+        {
+            case 0:
+                CheckedFinalGrades = true;
+                return await FetchGradesReport().ConfigureAwait(false);
+            default:
+                return grades;
+        }
     }
 
     private async Task RefreshCoursesUrls(Dictionary<string, string> courses)
@@ -278,7 +298,7 @@ internal partial class Session(User user)
             var myCourses = (await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient, User.DiscordUserId).ConfigureAwait(false)).Split('\n');
 
             // Filter the array to only contain the relevant courses
-            myCourses = (string[])myCourses.Where(line => line.Contains(_currentSemester));
+            myCourses = myCourses.Where(line => line.Contains(_currentSemester)).ToArray();
 
             // Get the course's name and url and add it to the configuration
             foreach (var line in myCourses)
