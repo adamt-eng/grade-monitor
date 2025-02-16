@@ -28,7 +28,7 @@ internal partial class Session(User user)
     internal int Fails; // Fail counter
 
     internal bool HeavyLoad; // Indicates load type to determine if it will fetch detailed grades or only final grades for faster retrieval
-    private bool CheckedFinalGrades; // Indicates whether or not we have checked for the final grades
+    private bool _checkedFinalGrades; // Indicates whether or not we have checked for the final grades
 
     private readonly CookieContainer _cookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
     private HttpClient _httpClient;
@@ -57,14 +57,18 @@ internal partial class Session(User user)
             // Extract token
             var token = html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false);
 
+            var isAlternateVersion = html.Contains("email1");
+
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                { "email1", $"{User.StudentId}@eng.asu.edu.eg" },
-                { "password1", User.Password },
-                { "_token", token }
+                { "_token", token },
+                { isAlternateVersion ? "email1" : "email", $"{User.StudentId}@eng.asu.edu.eg" },
+                { isAlternateVersion ? "password1" : "password", User.Password }
             });
 
-            using var response = await _httpClient.PostAsync("https://eng.asu.edu.eg/log1n", content).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync(isAlternateVersion
+                ? "https://eng.asu.edu.eg/log1n"
+                : "https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
@@ -76,14 +80,13 @@ internal partial class Session(User user)
                     {
                         throw new Exception("Filling questionnaire is required.");
                     }
-                    else if (html.Contains("alert alert-danger"))
+
+                    if (html.Contains("alert alert-danger"))
                     {
                         return false;
                     }
-                    else
-                    {
-                        throw new Exception("Login Error 1");
-                    }
+
+                    throw new Exception("Login Error 1");
                 }
             }
             else
@@ -143,13 +146,13 @@ internal partial class Session(User user)
 
     internal async Task<SortedDictionary<string, string>> FetchGradesReport()
     {
-        if (HeavyLoad && !CheckedFinalGrades)
+        if (HeavyLoad && !_checkedFinalGrades)
         {
             return await FetchOnlyFinalGradesAsync().ConfigureAwait(false);
         }
         else
         {
-            CheckedFinalGrades = false;
+            _checkedFinalGrades = false;
         }
 
         try
@@ -279,7 +282,7 @@ internal partial class Session(User user)
         switch (grades.Count)
         {
             case 0:
-                CheckedFinalGrades = true;
+                _checkedFinalGrades = true;
                 return await FetchGradesReport().ConfigureAwait(false);
             default:
                 return grades;
