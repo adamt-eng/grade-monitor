@@ -41,59 +41,69 @@ internal class Program
             // Acknowledge this interaction
             await socketSlashCommand.DeferAsync(ephemeral: true).ConfigureAwait(false);
 
+            Timer.Stop();
+
             var discordUserId = socketSlashCommand.User.Id;
             var dataOptions = socketSlashCommand.Data.Options.ToList();
             var option1 = dataOptions[0].Value.ToString();
             var option2 = dataOptions[1].Value.ToString();
 
-            if (socketSlashCommand.CommandName == "add-cookies")
+            User user;
+            
+            Sessions.TryGetValue(discordUserId, out var session);
+
+            if (session == null)
             {
-                var session = Sessions[discordUserId];
+                user = new User { DiscordUserId = discordUserId };
 
-                if (session != null)
+                // Save new user
+                if (socketSlashCommand.CommandName == "get-grades")
                 {
-                    var user = session.User;
-                    user.XsrfToken = option1;
-                    user.LaravelSession = option2;
-
-                    // Update config.json
-                    ConfigurationManager.Save(Configuration);
-
-                    await socketSlashCommand.FollowupAsync("Cookies added successfully.", ephemeral: true).ConfigureAwait(false);
+                    user.StudentId = option1;
+                    user.Password = option2;
                 }
                 else
                 {
-                    await socketSlashCommand.FollowupAsync("User not registered.", ephemeral: true).ConfigureAwait(false);
+                    user.XsrfToken = option1;
+                    user.LaravelSession = option2;
                 }
+
+                // Add user to configuration
+                Configuration.Users.Add(user);
             }
             else
             {
-                // Save new user
-                var user = new User
-                {
-                    DiscordUserId = discordUserId,
-                    StudentId = option1,
-                    Password = option2
-                };
+                user = session.User;
 
                 // Clear stored semester data to force the application to refetch them
                 // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
                 // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
                 user.Semesters.Clear();
 
-                // Add user to configuration
-                Configuration.Users.Add(user);
-
-                // Update config.json
-                ConfigurationManager.Save(Configuration);
-
-                // Initialize new session and store it
-                Sessions[discordUserId] = new Session(user: user);
-
-                await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
-
-                await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+                // Update user information
+                if (socketSlashCommand.CommandName == "get-grades")
+                {
+                    user.StudentId = option1;
+                    user.Password = option2;
+                }
+                else
+                {
+                    user.XsrfToken = option1;
+                    user.LaravelSession = option2;
+                }
             }
+
+            // Update config.json
+            ConfigurationManager.Save(Configuration);
+
+            // Initialize new session and store it
+            Sessions[discordUserId] = new Session(user: user);
+
+            await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
+
+            await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+
+            Timer.Start();
         };
 
         Client.SelectMenuExecuted += async socketMessageComponent =>
@@ -139,10 +149,16 @@ internal class Program
         {
             var interval = Configuration.TimerIntervalInMinutes * 60;
             
+            // ReSharper disable once AsyncVoidMethod
             async void OnTimerElapsed(object sender, ElapsedEventArgs e)
             {
                 // Get user count
                 var userCount = Configuration.Users.Count;
+
+                if (userCount == 0)
+                {
+                    return;
+                }
 
                 // Divide the total interval specified in the configuration by the user count
                 // This will give us the time that is between each user's auto-refresh request
@@ -218,8 +234,8 @@ internal class Program
             var dmChannel = await user.CreateDMChannelAsync().ConfigureAwait(false);
             var messages = (await dmChannel.GetMessagesAsync().FlattenAsync().ConfigureAwait(false)).ToList();
 
-            var message = (IUserMessage)null;
-            var previousEmbedBuilder = (EmbedBuilder)null;
+            IUserMessage message = null;
+            EmbedBuilder previousEmbedBuilder = null;
 
             // If there was a previous message sent between the user and the bot
             if (messages.Count == 1)
