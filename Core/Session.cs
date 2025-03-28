@@ -149,6 +149,14 @@ internal partial class Session(User user)
         _studentCourses = await HttpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient, User.DiscordUserId).ConfigureAwait(false);
         _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
+        if (User.StudentId == null)
+        {
+            User.StudentId = _studentCourses.ExtractBetween("<strong>", "</strong>", lastIndexOf: false).Trim();
+
+            // Update config.json
+            Program.ConfigurationManager.Save(Program.Configuration);
+        }
+
         // Store the name of each semester the student took a course during
         foreach (Match semester in SemesterRegex().Matches(_studentCourses))
         {
