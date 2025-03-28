@@ -1,8 +1,7 @@
-﻿using Grade_Monitor.Core;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-using System;
+﻿using System;
 using System.IO;
+using Grade_Monitor.Core;
+using Newtonsoft.Json;
 
 namespace Grade_Monitor.Configuration;
 
