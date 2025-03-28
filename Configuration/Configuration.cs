@@ -16,5 +16,7 @@ public class User
     public ulong DiscordUserId { get; set; }
     public string StudentId { get; set; }
     public string Password { get; set; }
+    public string LaravelSession { get; set; }
+    public string XsrfToken { get; set; }
     public Dictionary<string, HashSet<string>> Semesters { get; set; } = [];
 }

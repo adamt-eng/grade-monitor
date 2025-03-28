@@ -1,13 +1,13 @@
-﻿using Discord;
-using Discord.WebSocket;
-using Grade_Monitor.Configuration;
-using Grade_Monitor.Utilities;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using Discord;
+using Discord.WebSocket;
+using Grade_Monitor.Configuration;
+using Grade_Monitor.Utilities;
 
 namespace Grade_Monitor.Core;
 
@@ -41,37 +41,59 @@ internal class Program
             // Acknowledge this interaction
             await socketSlashCommand.DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-            // Extract studentId, password, and discordUserId
-            var dataOptions = socketSlashCommand.Data.Options.ToList();
-            var studentId = dataOptions[0].Value.ToString();
-            var password = dataOptions[1].Value.ToString();
             var discordUserId = socketSlashCommand.User.Id;
+            var dataOptions = socketSlashCommand.Data.Options.ToList();
+            var option1 = dataOptions[0].Value.ToString();
+            var option2 = dataOptions[1].Value.ToString();
 
-            // Save new user
-            var user = new User
+            if (socketSlashCommand.CommandName == "add-cookies")
             {
-                DiscordUserId = discordUserId,
-                StudentId = studentId,
-                Password = password
-            };
+                var session = Sessions[discordUserId];
 
-            // Clear stored semester data to force the application to refetch them
-            // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
-            // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
-            user.Semesters.Clear();
+                if (session != null)
+                {
+                    var user = session.User;
+                    user.XsrfToken = option1;
+                    user.LaravelSession = option2;
 
-            // Add user to configuration
-            Configuration.Users.Add(user);
+                    // Update config.json
+                    ConfigurationManager.Save(Configuration);
 
-            // Update config.json
-            ConfigurationManager.Save(Configuration);
+                    await socketSlashCommand.FollowupAsync("Cookies added successfully.", ephemeral: true).ConfigureAwait(false);
+                }
+                else
+                {
+                    await socketSlashCommand.FollowupAsync("User not registered.", ephemeral: true).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                // Save new user
+                var user = new User
+                {
+                    DiscordUserId = discordUserId,
+                    StudentId = option1,
+                    Password = option2
+                };
 
-            // Initialize new session and store it
-            Sessions[discordUserId] = new Session(user: user);
+                // Clear stored semester data to force the application to refetch them
+                // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
+                // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
+                user.Semesters.Clear();
 
-            await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
+                // Add user to configuration
+                Configuration.Users.Add(user);
 
-            await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+                // Update config.json
+                ConfigurationManager.Save(Configuration);
+
+                // Initialize new session and store it
+                Sessions[discordUserId] = new Session(user: user);
+
+                await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
+
+                await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+            }
         };
 
         Client.SelectMenuExecuted += async socketMessageComponent =>
@@ -329,6 +351,10 @@ internal class Program
                 if (message != null)
                 {
                     await message.ModifyAsync(x => x.Content = text).ConfigureAwait(false);
+                }
+                else if (exception.Message == "laravel_session and XSRF-TOKEN required from user.")
+                {
+                    await user.SendMessageAsync(text: "`Please use the 'add-cookies' slash command to bypass CAPTCHA.`", components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
                 }
                 else
                 {

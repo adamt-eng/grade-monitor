@@ -28,23 +28,14 @@ internal partial class Session(User user)
     internal int Fails; // Fail counter
 
     internal bool HeavyLoad; // Indicates load type to determine if it will fetch detailed grades or only final grades for faster retrieval
-    private bool _checkedFinalGrades; // Indicates whether or not we have checked for the final grades
+    private bool _checkedFinalGrades; // Indicates whether we have checked for the final grades or not
 
     private readonly CookieContainer _cookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
     private HttpClient _httpClient;
 
     internal async Task<bool> Login()
     {
-        _httpClient ??= new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer })
-        {
-            DefaultRequestHeaders =
-            {
-                {
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-                }
-            }
-        };
+        _httpClient ??= new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer });
         
         // Attempt to visit dashboard
         var html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId).ConfigureAwait(false);
@@ -56,9 +47,7 @@ internal partial class Session(User user)
 
             // Extract token
             var token = html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false);
-
             var isAlternateVersion = html.Contains("email1");
-
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 { "_token", token },
@@ -76,17 +65,66 @@ internal partial class Session(User user)
 
                 if (!html.Contains("my_courses"))
                 {
+                    // Filling questionnaire is required.
                     if (html.Contains("Questionnaire"))
                     {
                         throw new Exception("Filling questionnaire is required.");
                     }
 
+                    // Incorrect email, password or cookies.
                     if (html.Contains("alert alert-danger"))
                     {
-                        return false;
-                    }
+                        // Incorrect email or password.
+                        if (!html.Contains("recaptcha"))
+                        {
+                            Program.WriteLog($"{User.DiscordUserId}: Incorrect email or password.", ConsoleColor.Red);
+                            return false;
+                        }
 
-                    throw new Exception("Login Error 1");
+                        Program.WriteLog($"{User.DiscordUserId}: Solving CAPTCHA is required, attempting login with stored cookies..", ConsoleColor.Yellow);
+
+                        if (User.XsrfToken is null || User.LaravelSession is null)
+                        {
+                            throw new Exception("laravel_session and XSRF-TOKEN required from user.");
+                        }
+
+                        var uri = new Uri("https://eng.asu.edu.eg");
+                        UpdateCookie("XSRF-TOKEN", User.XsrfToken);
+                        UpdateCookie("laravel_session", User.LaravelSession);
+
+                        void UpdateCookie(string name, string value)
+                        {
+                            var cookie = _cookieContainer.GetCookies(uri).FirstOrDefault(c => c.Name == name);
+                            
+                            if (cookie != null)
+                            {
+                                cookie.Value = value;
+                            }
+                            else
+                            {
+                                _cookieContainer.Add(uri, new Cookie(name, value));
+                            }
+                        }
+
+                        html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId);
+                        if (!html.Contains("my_courses"))
+                        {
+                            // Filling questionnaire is required.
+                            if (html.Contains("Questionnaire"))
+                            {
+                                throw new Exception("Filling questionnaire is required.");
+                            }
+
+                            // Cookies invalid.
+                            if (html.Contains("alert alert-danger"))
+                            {
+                                Program.WriteLog($"{User.DiscordUserId}: Cookies invalid.", ConsoleColor.Red);
+                                return false;
+                            }
+
+                            throw new Exception("Login Error 1");
+                        }
+                    }
                 }
             }
             else
