@@ -35,108 +35,87 @@ internal partial class Session(User user)
 
     internal async Task<bool> Login()
     {
+        // Initialize _httpClient if it didn't get initialized before
         _httpClient ??= new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer });
         
         // Attempt to visit dashboard
         var html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId).ConfigureAwait(false);
 
-        // If the below condition is true, this indicates that user was redirected because they're not logged in
-        if (!html.Contains("my_courses"))
+        // If my_courses is accessible; user is already logged in
+        if (html.Contains("my_courses"))
         {
-            Program.WriteLog($"{User.DiscordUserId}: No stored session, initiating login..", ConsoleColor.Red);
+            Program.WriteLog($"{User.DiscordUserId}: Stored session found, reusing cookies.", ConsoleColor.Magenta);
+        }
+        else
+        {
+            Program.WriteLog($"{User.DiscordUserId}: No stored session, initiating login.", ConsoleColor.Red);
 
-            // Extract token
-            var token = html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false);
             var isAlternateVersion = html.Contains("email1");
             var content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                { "_token", token },
+                { "_token", html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false) },
                 { isAlternateVersion ? "email1" : "email", $"{User.StudentId}@eng.asu.edu.eg" },
                 { isAlternateVersion ? "password1" : "password", User.Password }
             });
 
-            using var response = await _httpClient.PostAsync(isAlternateVersion
-                ? "https://eng.asu.edu.eg/log1n"
-                : "https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
+            using var response = await _httpClient.PostAsync(isAlternateVersion ? "https://eng.asu.edu.eg/log1n" : "https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
 
-            if (response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                throw new Exception("Login Error 1");
+            }
 
-                if (!html.Contains("my_courses"))
+            html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+            // If my_courses is still not accessible
+            if (!html.Contains("my_courses"))
+            {
+                // Filling questionnaire is required.
+                if (html.Contains("Questionnaire"))
                 {
-                    // Filling questionnaire is required.
-                    if (html.Contains("Questionnaire"))
+                    // Prompts user to visit faculty site to fill the questionnaire.
+                    throw new Exception("Filling questionnaire is required.");
+                }
+
+                // Incorrect email, password, or solving CAPTCHA is required.
+                if (html.Contains("alert alert-danger"))
+                {
+                    // Incorrect email or password.
+                    if (!html.Contains("recaptcha"))
                     {
-                        throw new Exception("Filling questionnaire is required.");
+                        Program.WriteLog($"{User.DiscordUserId}: Incorrect email or password.", ConsoleColor.Red);
+                        return false;
                     }
 
-                    // Incorrect email, password or cookies.
-                    if (html.Contains("alert alert-danger"))
+                    // Solving CAPTCHA is required.
+                    Program.WriteLog($"{User.DiscordUserId}: Solving CAPTCHA is required, attempting login with laravel_session cookie.", ConsoleColor.Yellow);
+
+                    if (User.LaravelSession == null)
                     {
-                        // Incorrect email or password.
-                        if (!html.Contains("recaptcha"))
+                        // Prompts user to use the get-grades-using-session-cookie
+                        throw new Exception("laravel_session cookie value required from user.");
+                    }
+
+                    _cookieContainer.SetCookies(new Uri("https://eng.asu.edu.eg"), $"laravel_session={User.LaravelSession}");
+
+                    html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId);
+
+                    // If my_courses is still not accessible
+                    if (!html.Contains("my_courses"))
+                    {
+                        // Filling questionnaire is required.
+                        if (html.Contains("Questionnaire"))
                         {
-                            Program.WriteLog($"{User.DiscordUserId}: Incorrect email or password.", ConsoleColor.Red);
-                            return false;
+                            // Prompts user to visit faculty site to fill the questionnaire.
+                            throw new Exception("Filling questionnaire is required.");
                         }
 
-                        Program.WriteLog($"{User.DiscordUserId}: Solving CAPTCHA is required, attempting login with stored cookies..", ConsoleColor.Yellow);
-
-                        if (User.XsrfToken is null || User.LaravelSession is null)
-                        {
-                            throw new Exception("laravel_session and XSRF-TOKEN required from user.");
-                        }
-
-                        var uri = new Uri("https://eng.asu.edu.eg");
-                        UpdateCookie("XSRF-TOKEN", User.XsrfToken);
-                        UpdateCookie("laravel_session", User.LaravelSession);
-
-                        void UpdateCookie(string name, string value)
-                        {
-                            var cookie = _cookieContainer.GetCookies(uri).FirstOrDefault(c => c.Name == name);
-                            
-                            if (cookie != null)
-                            {
-                                cookie.Value = value;
-                            }
-                            else
-                            {
-                                _cookieContainer.Add(uri, new Cookie(name, value));
-                            }
-                        }
-
-                        html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId);
-                        if (!html.Contains("my_courses"))
-                        {
-                            // Filling questionnaire is required.
-                            if (html.Contains("Questionnaire"))
-                            {
-                                throw new Exception("Filling questionnaire is required.");
-                            }
-
-                            // Cookies invalid.
-                            if (html.Contains("alert alert-danger"))
-                            {
-                                Program.WriteLog($"{User.DiscordUserId}: Cookies invalid.", ConsoleColor.Red);
-                                return false;
-                            }
-
-                            throw new Exception("Login Error 1");
-                        }
+                        throw new Exception("Login Error 2");
                     }
                 }
             }
-            else
-            {
-                throw new Exception("Login Error 2");
-            }
 
-            Program.WriteLog($"{User.DiscordUserId}: Logged in successfully..", ConsoleColor.Magenta);
-        }
-        else
-        {
-            Program.WriteLog($"{User.DiscordUserId}: Stored session found, reusing cookies..", ConsoleColor.Magenta);
+            Program.WriteLog($"{User.DiscordUserId}: Logged in successfully.", ConsoleColor.Magenta);
         }
 
         // Extract CGPA from dashboard
