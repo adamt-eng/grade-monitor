@@ -48,49 +48,30 @@ internal class Program
             var option1 = dataOptions[0].Value.ToString();
             var option2 = dataOptions[1].Value.ToString();
 
-            User user;
-            
             Sessions.TryGetValue(discordUserId, out var session);
 
-            if (session == null)
+            var user = session == null ? new User { DiscordUserId = discordUserId } : session.User;
+
+            // Clear stored semester data to force the application to re-fetch them
+            // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
+            // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
+            user.Semesters.Clear();
+
+            // Save user information
+            if (socketSlashCommand.CommandName == "get-grades-using-id-and-password")
             {
-                user = new User { DiscordUserId = discordUserId };
-
-                // Save new user
-                if (socketSlashCommand.CommandName == "get-grades")
-                {
-                    user.StudentId = option1;
-                    user.Password = option2;
-                }
-                else
-                {
-                    user.XsrfToken = option1;
-                    user.LaravelSession = option2;
-                }
-
-                // Add user to configuration
-                Configuration.Users.Add(user);
+                user.StudentId = option1;
+                user.Password = option2;
             }
             else
             {
-                user = session.User;
+                user.LaravelSession = option1;
+            }
 
-                // Clear stored semester data to force the application to refetch them
-                // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
-                // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
-                user.Semesters.Clear();
-
-                // Update user information
-                if (socketSlashCommand.CommandName == "get-grades")
-                {
-                    user.StudentId = option1;
-                    user.Password = option2;
-                }
-                else
-                {
-                    user.XsrfToken = option1;
-                    user.LaravelSession = option2;
-                }
+            if (session == null)
+            {
+                // Add user to configuration
+                Configuration.Users.Add(user);
             }
 
             // Update config.json
@@ -219,7 +200,7 @@ internal class Program
     {
         try
         {
-            // New line to seperate events
+            // New line to separate events
             Console.WriteLine();
 
             // Log interaction
@@ -352,29 +333,23 @@ internal class Program
 
                 // Tracking the fails count allows us to track how long the faculty server has been down
                 ++session.Fails;
-                var text = $"{NextRefresh(session.Timer)}🔂 ({session.Fails})";
+                var text = $"{NextRefresh(session.Timer)}🔂 ({session.Fails}) {exception.Message}";
 
-                if (exception.Message == "Filling questionnaire is required.")
-                {
-                    text += $" {exception.Message}";
-                }
-                else
+                if (exception.Message.Contains("Login Error"))
                 {
                     // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
                     session.Timer = Configuration.TimerIntervalAfterExceptionsInMinutes * 60;
+
+                    text += "\n\n`Faculty server is currently down.`";
                 }
 
                 if (message != null)
                 {
                     await message.ModifyAsync(x => x.Content = text).ConfigureAwait(false);
                 }
-                else if (exception.Message == "laravel_session and XSRF-TOKEN required from user.")
-                {
-                    await user.SendMessageAsync(text: "`Please use the 'add-cookies' slash command to bypass CAPTCHA.`", components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
-                }
                 else
                 {
-                    await user.SendMessageAsync(text: $"{text}\n\n`Faculty server is currently down.`", components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
+                    await user.SendMessageAsync(text: text, components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
                 }
             }
         }
