@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using Discord;
 
 namespace Grade_Monitor.Utilities;
@@ -11,8 +13,29 @@ internal static class DiscordHelper
     {
         var selectSemesterMenuOptions = new List<SelectMenuOptionBuilder>();
 
+        // Sort the semesters in chronological order
+        var orderedSemesters = semesters.OrderBy(static s =>
+        {
+            var semester = s.Split(' ');
+
+            var season = semester[0];
+            var year = int.Parse(semester[1]);
+
+            // Assign a numerical value to each season for proper ordering
+            var seasonOrder = season switch
+            {
+                "Spring" => 0,
+                "Summer" => 1,
+                "Fall" => 2,
+                _ => throw new ArgumentOutOfRangeException(nameof(s))
+            };
+
+            // Combine year and season order
+            return year * 3 + seasonOrder;
+        }).ToList();
+
         // Add each semester as a selectable option to selectSemesterMenuOptions
-        foreach (var semester in semesters)
+        foreach (var semester in orderedSemesters)
         {
             selectSemesterMenuOptions.Add(new SelectMenuOptionBuilder
             {
