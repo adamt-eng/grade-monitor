@@ -62,7 +62,7 @@ internal partial class Session(User user)
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new Exception("Login Error 1");
+                throw new Exception("Faculty server is currently down.");
             }
 
             html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -74,7 +74,7 @@ internal partial class Session(User user)
                 if (html.Contains("Questionnaire"))
                 {
                     // Prompts user to visit faculty site to fill the questionnaire.
-                    throw new Exception("Filling questionnaire is required.");
+                    throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
                 }
 
                 // Incorrect email, password, or solving CAPTCHA is required.
@@ -83,17 +83,17 @@ internal partial class Session(User user)
                     // Incorrect email or password.
                     if (!html.Contains("recaptcha"))
                     {
-                        Program.WriteLog($"{User.DiscordUserId}: Incorrect email or password.", ConsoleColor.Red);
-                        return false;
+                        // Incorrect email or password.
+                        throw new Exception("Incorrect Student ID or password. Please check your credentials and try again.");
                     }
 
                     // Solving CAPTCHA is required.
-                    Program.WriteLog($"{User.DiscordUserId}: Solving CAPTCHA is required, attempting login with laravel_session cookie.", ConsoleColor.Yellow);
+                    Program.WriteLog($"{User.DiscordUserId}: CAPTCHA required; attempting login with 'laravel_session' cookie.", ConsoleColor.Yellow);
 
                     if (User.LaravelSession == null)
                     {
                         // Prompts user to use the get-grades-using-session-cookie
-                        throw new Exception("laravel_session cookie value required from user.");
+                        throw new Exception("Login attempt using email and password has failed due to a CAPTCHA. Please use the `/get-grades-using-session-cookie` command.");
                     }
 
                     _cookieContainer.SetCookies(new Uri("https://eng.asu.edu.eg"), $"laravel_session={User.LaravelSession}");
@@ -107,10 +107,10 @@ internal partial class Session(User user)
                         if (html.Contains("Questionnaire"))
                         {
                             // Prompts user to visit faculty site to fill the questionnaire.
-                            throw new Exception("Filling questionnaire is required.");
+                            throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
                         }
 
-                        throw new Exception("Login Error 2");
+                        throw new Exception("The 'laravel_session' cookie has expired. Please update it's value using the `/get-grades-using-session-cookie` command.");
                     }
                 }
             }

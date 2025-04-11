@@ -187,7 +187,7 @@ internal class Program
         await Task.Delay(-1).ConfigureAwait(false);
     }
 
-    private static string NextRefresh(double intervalInSeconds) => $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddSeconds(intervalInSeconds)).ToUnixTimeSeconds()}:R> {new Emoji("🕒")}";
+    private static string NextRefresh(double intervalInSeconds) => $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddSeconds(intervalInSeconds)).ToUnixTimeSeconds()}:R> 🕒";
 
     internal static void WriteLog(string log, ConsoleColor consoleColor)
     {
@@ -322,34 +322,28 @@ internal class Program
                     // Reset fails counter
                     session.Fails = 0;
                 }
-                else
-                {
-                    await user.SendMessageAsync(text: "`Incorrect Student ID or Password.`", components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
-                }
             }
             catch (Exception exception)
             {
                 WriteLog($"{discordUserId}: Exception 1: {exception.Message}", ConsoleColor.Red);
 
-                // Tracking the fails count allows us to track how long the faculty server has been down
-                ++session.Fails;
-                var text = $"{NextRefresh(session.Timer)}🔂 ({session.Fails}) {exception.Message}";
-
-                if (exception.Message.Contains("Login Error"))
+                if (exception.Message == "Faculty server is currently down." || exception.Message.Contains("FetchPage"))
                 {
                     // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
                     session.Timer = Configuration.TimerIntervalAfterExceptionsInMinutes * 60;
-
-                    text += "\n\n`Faculty server is currently down.`";
                 }
 
-                if (message != null)
+                ++session.Fails;
+
+                var text = $"{NextRefresh(session.Timer)}\n\nAttempt #{session.Fails} 🔂\n\nError: {exception.Message}";
+
+                if (message == null)
                 {
-                    await message.ModifyAsync(x => x.Content = text).ConfigureAwait(false);
+                    await user.SendMessageAsync(text: text, components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
                 }
                 else
                 {
-                    await user.SendMessageAsync(text: text, components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
+                    await message.ModifyAsync(x => x.Content = text).ConfigureAwait(false);
                 }
             }
         }
