@@ -71,7 +71,7 @@ internal partial class Session(User user)
             if (!html.Contains("my_courses"))
             {
                 // Filling questionnaire is required.
-                if (html.Contains("Questionnaire"))
+                if (html.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
                 {
                     // Prompts user to visit faculty site to fill the questionnaire.
                     throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
@@ -104,7 +104,7 @@ internal partial class Session(User user)
                     if (!html.Contains("my_courses"))
                     {
                         // Filling questionnaire is required.
-                        if (html.Contains("Questionnaire"))
+                        if (html.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
                         {
                             // Prompts user to visit faculty site to fill the questionnaire.
                             throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
@@ -126,6 +126,14 @@ internal partial class Session(User user)
     internal async Task InitializeMembers(IUserMessage message)
     {
         _studentCourses = await HttpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient, User.DiscordUserId).ConfigureAwait(false);
+
+        // Filling questionnaire is required.
+        if (_studentCourses.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
+        {
+            // Prompts user to visit faculty site to fill the questionnaire.
+            throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
+        }
+
         _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
         if (User.StudentId == null)
