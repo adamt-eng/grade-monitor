@@ -46,7 +46,6 @@ internal class Program
             var discordUserId = socketSlashCommand.User.Id;
             var dataOptions = socketSlashCommand.Data.Options.ToList();
             var option1 = dataOptions[0].Value.ToString();
-            var option2 = dataOptions[1].Value.ToString();
 
             Sessions.TryGetValue(discordUserId, out var session);
 
@@ -61,7 +60,7 @@ internal class Program
             if (socketSlashCommand.CommandName == "get-grades-using-id-and-password")
             {
                 user.StudentId = option1;
-                user.Password = option2;
+                user.Password = dataOptions[1].Value.ToString();
             }
             else
             {
@@ -80,9 +79,9 @@ internal class Program
             // Initialize new session and store it
             Sessions[discordUserId] = new Session(user: user);
 
-            await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
-
             await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+
+            await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
 
             Timer.Start();
         };
@@ -344,6 +343,11 @@ internal class Program
                 else
                 {
                     await message.ModifyAsync(x => x.Content = text).ConfigureAwait(false);
+
+                    if (session.Fails == 1)
+                    {
+                        await user.SendMessageAsync(text: $"<@{user.Id}>").ConfigureAwait(false);
+                    }
                 }
             }
         }
