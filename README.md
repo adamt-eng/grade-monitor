@@ -2,6 +2,11 @@
 
 An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters, manage server load, and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
+## Showcase
+![Showcase](Showcase.gif)
+
+- Empty result when using `Heavy Load` indicates that final grades for the specified semester aren't released yet.
+
 ## Features
 
 - **Automatic Grade Retrieval:** The app logs in and retrieves the user's grades from the relevant pages on the faculty portal, sending the results directly to the user in a private message.
@@ -55,11 +60,6 @@ To manually refresh and check for updated grades:
 - The bot will refresh the grade data based on the current semester and load selection.
 
 This interaction flow ensures that you always have access to your most up-to-date grades while providing flexibility to manage how data is retrieved based on server conditions.
-
-## Showcase
-![Showcase](Showcase.gif)
-
-- Empty result when using `Heavy Load` indicates that final grades for the specified semester aren't released yet.
 
 ## Setup Instructions
 
