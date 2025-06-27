@@ -97,6 +97,7 @@ internal partial class Session(User user)
                     }
 
                     _cookieContainer.SetCookies(new Uri("https://eng.asu.edu.eg"), $"laravel_session={User.LaravelSession}");
+                    _cookieContainer.SetCookies(new Uri("https://eng.asu.edu.eg"), $"asueng_web={User.LaravelSession}");
 
                     html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId);
 
