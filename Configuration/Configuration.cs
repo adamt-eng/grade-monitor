@@ -4,6 +4,7 @@ namespace Grade_Monitor.Configuration;
 
 public class Configuration
 {
+    public string CaptchaSolverApiKey { get; set; }
     public string BotToken { get; set; }
     public int TimerIntervalInMinutes { get; set; } = 60;
     public int TimerIntervalAfterExceptionsInMinutes { get; set; } = 1;

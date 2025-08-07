@@ -13,14 +13,18 @@ public class ConfigurationManager(string configFilePath)
         if (!File.Exists(configFilePath))
         {
             Program.WriteLog("Please enter your Discord bot's authorization token: ", ConsoleColor.Yellow);
-            Save(new Configuration { BotToken = Console.ReadLine() });
+            var botToken = Console.ReadLine();
+
+            Program.WriteLog("Please enter your solvecaptcha.com API key: ", ConsoleColor.Yellow);
+            var captchaSolverApiKey = Console.ReadLine();
+
+            Save(new Configuration { BotToken = botToken, CaptchaSolverApiKey = captchaSolverApiKey });
+
             Console.Clear();
         }
 
         return JsonConvert.DeserializeObject<Configuration>(File.ReadAllText(configFilePath), _jsonSettings);
     }
-    public void Save(Configuration configuration)
-    {
-        File.WriteAllText(configFilePath, JsonConvert.SerializeObject(configuration, _jsonSettings));
-    }
+
+    public void Save(Configuration configuration) => File.WriteAllText(configFilePath, JsonConvert.SerializeObject(configuration, _jsonSettings));
 }
