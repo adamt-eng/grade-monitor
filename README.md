@@ -2,6 +2,15 @@
 
 An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
+## Used Technologies
+
+- **.NET 9 (C#):** Core framework for building and running the application logic.
+- **Selenium WebDriver:** Used to automate browser interactions for login and reCAPTCHA solving.
+- **SolveCaptcha API:** Used to programmatically solve Google reCAPTCHA v2 challenges.
+- **Json.NET (Newtonsoft.Json):** For parsing and handling JSON configurations and API responses.
+- **CookieContainer (System.Net):** Maintains session cookies between HTTP requests for persistent login sessions.
+- **Discord.Net:** A C# wrapper for the Discord API, enabling bot interaction, slash commands, and message handling.
+
 ## Showcase
 ![Showcase](Showcase.gif)
 
