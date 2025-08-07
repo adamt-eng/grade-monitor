@@ -35,55 +35,75 @@ internal class Program
             return Task.CompletedTask;
         };
 
-        // Slash command handler
         Client.SlashCommandExecuted += async socketSlashCommand =>
         {
             // Acknowledge this interaction
             await socketSlashCommand.DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-            Timer.Stop();
-
-            var discordUserId = socketSlashCommand.User.Id;
             var dataOptions = socketSlashCommand.Data.Options.ToList();
-            var option1 = dataOptions[0].Value.ToString();
+            var option1 = dataOptions[0].Value;
+            var option2 = dataOptions[1].Value;
 
-            Sessions.TryGetValue(discordUserId, out var session);
-
-            var user = session == null ? new User { DiscordUserId = discordUserId } : session.User;
-
-            // Clear stored semester data to force the application to re-fetch them
-            // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
-            // The user must reuse the slash command in such cases to register the new courses or to remove the withdrawn/dropped courses
-            user.Semesters.Clear();
-
-            // Save user information
-            if (socketSlashCommand.CommandName == "get-grades-using-id-and-password")
+            if (socketSlashCommand.Data.Name == "update-interval")
             {
-                user.StudentId = option1;
-                user.Password = dataOptions[1].Value.ToString();
+                Timer.Stop();
+
+                Configuration.TimerIntervalInMinutes = Convert.ToInt32(option1);
+                Configuration.TimerIntervalAfterExceptionsInMinutes = Convert.ToInt32(option2);
+                ConfigurationManager.Save(Configuration);
+
+                Sessions.Clear();
+
+                Timer.Start();
+
+                await socketSlashCommand.FollowupAsync("Intervals updated successfully.", ephemeral: true).ConfigureAwait(false);
             }
-            else
+            else if (socketSlashCommand.Data.Name == "get-grades")
             {
-                user.LaravelSession = option1;
-            }
+                Timer.Stop();
 
-            if (session == null)
-            {
+                var discordUserId = socketSlashCommand.User.Id;
+
+                Sessions.TryGetValue(discordUserId, out var session);
+
+                User user;
+                // Session being null indicates that the user was not registered to the app
+                // and thus their data is not saved in config.json
+                if (session == null)
+                {
+                    user = new User { DiscordUserId = discordUserId };
+                }
+                else
+                {
+                    user = session.User;
+                    user.Semesters.Clear(); // Clearing semesters forces the app to refetch them
+                }
+
+                // Save user information
+                if (socketSlashCommand.CommandName == "get-grades")
+                {
+                    user.StudentId = option1.ToString();
+                    user.Password = option2.ToString();
+                }
+
                 // Add user to configuration
-                Configuration.Users.Add(user);
+                if (session == null)
+                {
+                    Configuration.Users.Add(user);
+                }
+
+                // Update config.json
+                ConfigurationManager.Save(Configuration);
+
+                // Initialize new session and store it
+                Sessions[discordUserId] = new Session(user: user);
+
+                await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+
+                await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
+
+                Timer.Start();
             }
-
-            // Update config.json
-            ConfigurationManager.Save(Configuration);
-
-            // Initialize new session and store it
-            Sessions[discordUserId] = new Session(user: user);
-
-            await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
-
-            await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
-
-            Timer.Start();
         };
 
         Client.SelectMenuExecuted += async socketMessageComponent =>
@@ -103,14 +123,12 @@ internal class Program
             {
                 case "select-semester":
                     {
-                        // Update semester based on selection
                         Sessions[discordUserId].RequestedSemester = selection;
                         break;
                     }
-                case "select-load":
+                case "select-mode":
                     {
-                        // Update load state based on selection
-                        Sessions[discordUserId].HeavyLoad = selection == "Heavy Load";
+                        Sessions[discordUserId].FetchFinalGradesOnly = selection == "Final Grades";
                         break;
                     }
             }
@@ -122,57 +140,40 @@ internal class Program
         {
             // Acknowledge this interaction
             await socketMessageComponent.DeferAsync(ephemeral: true).ConfigureAwait(false);
-            await GetGrades(discordUserId: socketMessageComponent.User.Id, interactionType: "ButtonExecuted").ConfigureAwait(false);
+
+            switch (socketMessageComponent.Data.CustomId)
+            {
+                case "refresh-grades": await GetGrades(discordUserId: socketMessageComponent.User.Id, interactionType: "ButtonExecuted (Refresh Grades)").ConfigureAwait(false); break;
+                case "refetch-courses":
+                {
+                    Timer.Stop();
+
+                    var discordUserId = socketMessageComponent.User.Id;
+
+                    Sessions.TryGetValue(discordUserId, out var session);
+
+                    if (session == null)
+                    {
+                        await socketMessageComponent.FollowupAsync("Unable to find your credentials, please use the command `/get-grades` again.", ephemeral: true).ConfigureAwait(false);
+                        Timer.Start();
+                        break;
+                    }
+
+                    // Clear stored semester data to force the application to refetch them
+                    // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
+                    session.User.Semesters.Clear();
+
+                    await GetGrades(discordUserId: discordUserId, interactionType: "ButtonExecuted (Refetch Courses)").ConfigureAwait(false);
+
+                    Timer.Start();
+                    break;
+                }
+            }
         };
 
         Client.Ready += () =>
         {
-            var interval = Configuration.TimerIntervalInMinutes * 60;
-            
-            // ReSharper disable once AsyncVoidMethod
-            async void OnTimerElapsed(object sender, ElapsedEventArgs e)
-            {
-                // Get user count
-                var userCount = Configuration.Users.Count;
-
-                if (userCount == 0)
-                {
-                    return;
-                }
-
-                // Divide the total interval specified in the configuration by the user count
-                // This will give us the time that is between each user's auto-refresh request
-                // This makes sure that the auto-refresh requests are as far away as possible from each other
-                var intervalPerUser = interval / userCount;
-
-                // Track user index
-                var index = 0;
-
-                foreach (var user in Configuration.Users)
-                {
-                    var discordUserId = user.DiscordUserId;
-
-                    if (!Sessions.TryGetValue(discordUserId, out var session))
-                    {
-                        var timer = intervalPerUser * index;
-
-                        session = new Session(user: user) { Timer = timer };
-                        Sessions[discordUserId] = session;
-
-                        WriteLog($"{discordUserId}: Created session, starting monitoring in {timer} seconds.", ConsoleColor.Cyan);
-                    }
-
-                    if (session.Timer == 0)
-                    {
-                        session.Timer = interval;
-                        await GetGrades(discordUserId, "OnTimerElapsed").ConfigureAwait(false);
-                    }
-
-                    --session.Timer;
-
-                    ++index;
-                }
-            }
+            DiscordHelper.EnsureCommandsExist(Client);
 
             Timer.Interval = 1000;
             Timer.Elapsed += OnTimerElapsed;
@@ -184,6 +185,59 @@ internal class Program
         await Client.LoginAsync(TokenType.Bot, Configuration.BotToken).ConfigureAwait(false);
         await Client.StartAsync().ConfigureAwait(false);
         await Task.Delay(-1).ConfigureAwait(false);
+    }
+
+    private static void OnTimerElapsed(object sender, ElapsedEventArgs e)
+    {
+        // This timer refreshes every one second, but grades are not surely fetched every 1 second
+        // Each user has a timestamp at which their grades will be fetched
+        // And the fetch requests are made as far away as possible from each other to minimize any interference
+
+        var interval = Configuration.TimerIntervalInMinutes * 60;
+
+        // Get user count
+        var userCount = Configuration.Users.Count;
+
+        // No users, no point in proceeding
+        if (userCount == 0)
+        {
+            return;
+        }
+
+        // Divide the total interval specified in the configuration by the user count
+        // This will give us the time that is between each user's auto-refresh request
+        // This makes sure that the auto-refresh requests are as far away as possible from each other
+        var intervalPerUser = interval / userCount;
+
+        // Track user index
+        var index = 0;
+
+        foreach (var user in Configuration.Users)
+        {
+            var discordUserId = user.DiscordUserId;
+
+            // If user is not stored in Sessions
+            if (!Sessions.TryGetValue(discordUserId, out var session))
+            {
+                var timer = intervalPerUser * index;
+
+                session = new Session(user: user) { Timer = timer };
+                Sessions[discordUserId] = session;
+
+                WriteLog($"{discordUserId}: Created session, starting monitoring in {timer} seconds.", ConsoleColor.Cyan);
+            }
+
+            // It is time to fetch grades for this user
+            if (session.Timer == 0)
+            {
+                session.Timer = interval;
+                GetGrades(discordUserId, "OnTimerElapsed").Wait();
+            }
+
+            --session.Timer;
+
+            ++index;
+        }
     }
 
     private static string NextRefresh(double intervalInSeconds) => $"Next refresh <t:{((DateTimeOffset)DateTime.Now.AddSeconds(intervalInSeconds)).ToUnixTimeSeconds()}:R> 🕒";
@@ -244,7 +298,10 @@ internal class Program
                 // Delete all messages in the DM channel
                 foreach (var item in messages)
                 {
-                    await item.DeleteAsync().ConfigureAwait(false);
+                    if (item.Author.Id == 1227871966057205841)
+                    {
+                        await item.DeleteAsync().ConfigureAwait(false);
+                    }
                 }
             }
             // If message was null, a new message is sent regardless of if the grades were updated
@@ -285,14 +342,12 @@ internal class Program
                         Fields = embedFieldBuilders
                     };
 
-                    var components = DiscordHelper.CreateMessageComponent(session.User.Semesters.Keys.ToHashSet(), session.RequestedSemester, session.HeavyLoad);
+                    var components = DiscordHelper.CreateMessageComponent([.. session.User.Semesters.Keys], session.RequestedSemester, session.FetchFinalGradesOnly);
 
                     // If the call was from the timer and the embeds are identical (grades not changed)
-                    // Or if the user changed their selection of semester or load
+                    // Or if the user changed their selection of semester or mode
                     // Therefore, simply update the already sent message with the requested data
-                    if (message != null &&
-                        (interactionType.Contains("SelectMenuExecuted") ||
-                         interactionType == "OnTimerElapsed" && embedBuilder.IdenticalTo(previousEmbedBuilder)))
+                    if (message != null && (interactionType.Contains("SelectMenuExecuted") || interactionType == "OnTimerElapsed" && embedBuilder.IdenticalTo(previousEmbedBuilder)))
                     {
                         // Silently update the timestamp in the already sent message to indicate that the app is functioning as expected
                         await message.ModifyAsync(Update).ConfigureAwait(false);
@@ -324,6 +379,10 @@ internal class Program
             }
             catch (Exception exception)
             {
+                #if DEBUG
+                SeleniumHelper.DisposeDriver();
+                #endif
+
                 WriteLog($"{discordUserId}: Exception 1: {exception.Message}", ConsoleColor.Red);
 
                 if (exception.Message == "Faculty server is currently down." || exception.Message.Contains("FetchPage"))
@@ -338,7 +397,7 @@ internal class Program
 
                 if (message == null)
                 {
-                    await user.SendMessageAsync(text: text, components: new ComponentBuilder().WithButton(DiscordHelper.CreateRefreshButton()).Build()).ConfigureAwait(false);
+                    await user.SendMessageAsync(text: text, components: DiscordHelper.CreateMessageComponent()).ConfigureAwait(false);
                 }
                 else
                 {
