@@ -11,6 +11,14 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 - **CookieContainer (System.Net):** Stores and manages session cookies across HTTP requests.
 - **Discord.Net:** A C# wrapper for the Discord API, enabling bot interaction, slash commands, and message handling.
 
+---
+
+## 📸 Showcase
+
+![Showcase](Showcase.gif)
+
+---
+
 ## :sparkles: Features
 
 ### :closed_lock_with_key: Login
