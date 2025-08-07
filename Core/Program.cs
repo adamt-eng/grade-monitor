@@ -128,7 +128,7 @@ internal class Program
                     }
                 case "select-mode":
                     {
-                        Sessions[discordUserId].FetchFinalGradesOnly = selection == "Final Grades";
+                        Sessions[discordUserId].FetchFinalGradesOnly = selection == "Mode 1: Final Grades";
                         break;
                     }
             }
