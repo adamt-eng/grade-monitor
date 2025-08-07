@@ -1,4 +1,4 @@
-### Grade Monitor For Faculty of Engineering - Ain Shams University Students
+# Grade Monitor For Faculty of Engineering - Ain Shams University
 
 An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
@@ -66,19 +66,15 @@ The bot provides an option to manage how grades are retrieved:
 
 To manually refresh and check for updated grades:
 
-- Click the "Refresh Grades" button.
+- Click the `Refresh Grades` button.
 
 - The bot will refresh the grade data based on the current semester and mode selection.
 
-This interaction flow ensures that you always have access to your most up-to-date grades while providing flexibility to manage how data is retrieved based on server conditions.
-
 ### 5. Update Interval
 
-To update the intervals 
-
-- You can customize how often the app fetches your grades using the `/update-interval` command. This command allows you to set:
-	- normal-interval: The interval (in minutes) used under normal conditions.
-	- interval-after-errors: The interval (in minutes) used when an error occurs, allowing the app to retry more frequently until recovery.
+You can customize how often the app fetches your grades using the `/update-interval` command. This command allows you to set:
+- normal-interval: The interval (in minutes) used under normal conditions.
+- interval-after-errors: The interval (in minutes) used when an error occurs, allowing the app to retry more frequently until recovery.
 
 **Example:**
 
@@ -103,7 +99,18 @@ To update the intervals
 
 - Copy the bot's install link and use it to add the bot to your desired server.
 
-### 2. **Prerequisites**
+### 2. **Get an API Key from SolveCaptcha**
+
+To enable automated CAPTCHA solving, follow these steps to register with SolveCaptcha and integrate it into the app:
+
+1. **Sign Up for an Account:** Go to [https://solvecaptcha.com](https://solvecaptcha.com) and create an account if you haven’t already.
+
+2. **Generate an API Key**
+   - Once logged in, go to your **Dashboard**.
+   - Find your **API Key** under the API access section.
+   - Copy this key; you’ll need it later.
+
+### 3. **Prerequisites**
 
 - Ensure that you have [.NET 9.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) installed on your machine:
 
@@ -113,7 +120,7 @@ To update the intervals
   dotnet --version
   ```
 
-### 3. **Download the Source Code**
+### 4. **Download the Source Code**
 
 - Clone this repository using the following command:
 
@@ -121,7 +128,7 @@ To update the intervals
   git clone https://github.com/adamt-eng/grade-monitor
   ```
 
-### 4. **Navigate to the Project Directory**
+### 5. **Navigate to the Project Directory**
 
 - After cloning the repository, navigate into the project directory:
 
@@ -129,7 +136,7 @@ To update the intervals
   cd grade-monitor
   ```
 
-### 5. **Compile the Source Code**
+### 6. **Compile the Source Code**
 
 - Restore dependencies with the following command:
 
@@ -143,7 +150,7 @@ To update the intervals
   dotnet build --configuration Release
   ```
 
-### 6. **Run the Application:**
+### 7. **Run the Application:**
 
 - If the build is successful, you can run the application with:
 
