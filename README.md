@@ -1,11 +1,9 @@
 ### Grade Monitor For Faculty of Engineering - Ain Shams University Students
 
-An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters, manage server load, and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
+An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
 ## Showcase
 ![Showcase](Showcase.gif)
-
-- Empty result when using `Heavy Load` indicates that final grades for the specified semester aren't released yet.
 
 ## Features
 
@@ -13,29 +11,33 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 
 - **Semester Selection:** Users can select different semesters to view grades from previous terms. The current semester is selected by default, but users have the flexibility to choose any other available semester.
 
-- **Heavy Load Mode:** When faculty servers are under heavy load, this mode reduces the number of HTTP requests by retrieving only the final grades from the courses registration page. While it shows fewer details, it is particularly useful when awaiting final course grades.
+- **Mode 1: Final Grades:** When faculty servers are under heavy load, this mode reduces the number of HTTP requests by retrieving only the final grades from the courses registration page. While it shows fewer details, it is particularly useful when awaiting final course grades.
 
-- **Refresh Functionality:** Users can manually refresh the grades data to check for updates based on the current semester and load selection.
+- **Mode 2: All Grades:** This mode fetches all course grades such as final, midterm, activities, etc.
+
+- **Refresh Grades Button:** Users can manually refresh the grades data to check for updates based on the current semester and load selection.
+
+- **Refresh Courses Button:** Users can use the `Refresh Courses` button to force refetching of their course data, this is particularly useful to remove/add courses that users have dropped/withdrawn/registered.
 
 - **Session Persistence:** The app uses a `CookieContainer` to manage session cookies. This allows it to maintain a session across multiple requests without needing to log in repeatedly, saving network resources and reducing the time taken to get grades.
 
 - **Retry Mechanism:** Given the frequent downtimes of the faculty website, the app employs a retry mechanism to ensure reliable grade retrieval. If a request fails, the app will use a shorter refresh interval to check for grades more frequently so that we're able to retrieve the grades as soon as the server is back up.
 
+- **Update Interval:** The app allows you to customize how frequently it fetches your grades. There are two interval settings: one for normal conditions, and another used as part of the retry mechanism, which activates after an error to refresh more frequently until recovery.
+
+- **CAPTCHA Solver:** The app includes a [reCAPTCHA solver](solvecaptcha.com) to automatically solve the `I'm not a robot` challenges that are on the login page of the faculty site.
+
 ## Usage
 
 ### 1. Get Grades
 
-- Use the `/get-grades-with-id-and-password` slash command to get your grades report. This command requires your student ID and password.
+- Use the `/get-grades` command to get your grades report. This command requires your student id and password.
 
 **Example:**
 
 ```
-/get-grades-with-id-and-password student-id:23P0001 password:tHiSiSmYpAsSwOrD
+/get-grades student-id:23P0001 password:tHiSiSmYpAsSwOrD
 ```
-
-- You can alternatively use the `/get-grades-with-session-cookie` slash command to bypass the faculty site's CAPTCHA which is sometimes required to login. This command requires your `laravel_session` cookie value.
-
-- You can find your `laravel_session` cookie value stored in your browser after you successfully log in to the faculty's site manually.
 
 ### 2. Select Semester
 
@@ -43,23 +45,42 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
   
 - Select the semester you want to view grades for from the menu, the current (or latest) semester is selected by default.
 
-### 3. Manage Server Load
+### 3. Select Mode
 
-The bot provides an option to manage how grades are retrieved based on server load:
+The bot provides an option to manage how grades are retrieved:
 
-- **Normal Load:** Retrieves detailed course grades. This is the default setting.
+- **Mode 1: Final Grades:** Reduces the number of HTTP requests by retrieving only the final grades. Useful during peak times when the faculty servers are under heavy load.
 
-- **Heavy Load:** Reduces the number of HTTP requests by getting only the final grades. Useful during peak times when the faculty servers are under heavy load.
+- **Mode 2: All Grades:** Retrieves detailed course grades. This is the default setting.
 
 ### 4. Refresh Grades
 
 To manually refresh and check for updated grades:
 
-- Click the "Refresh" button in the private message sent by the bot.
+- Click the "Refresh Grades" button.
 
-- The bot will refresh the grade data based on the current semester and load selection.
+- The bot will refresh the grade data based on the current semester and mode selection.
 
 This interaction flow ensures that you always have access to your most up-to-date grades while providing flexibility to manage how data is retrieved based on server conditions.
+
+### 5. Update Interval
+
+To update the intervals 
+
+- You can customize how often the app fetches your grades using the `/update-interval` command. This command allows you to set:
+	- normal-interval: The interval (in minutes) used under normal conditions.
+	- interval-after-errors: The interval (in minutes) used when an error occurs, allowing the app to retry more frequently until recovery.
+
+**Example:**
+
+```
+/update-interval normal-interval:60 interval-after-errors:5
+```
+
+### 6. reCAPTCHA Solver
+
+- **CAPTCHA Solver:** The app includes a [reCAPTCHA solver](solvecaptcha.com) to automatically solve the `I'm not a robot` challenges that are on the login page of the faculty site.
+- Because of this reCAPTCHA, the app now utilizes [Selenium](https://github.com/SeleniumHQ/selenium) **for the login process only**, to be able to load the reCAPTCHA, solve it, and return the response.
 
 ## Setup Instructions
 
@@ -75,7 +96,7 @@ This interaction flow ensures that you always have access to your most up-to-dat
 
 ### 2. **Prerequisites**
 
-- Ensure that you have [.NET 8.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) installed on your machine:
+- Ensure that you have [.NET 9.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) installed on your machine:
 
 - You can verify the .NET SDK installation by running:
 
@@ -127,7 +148,5 @@ This interaction flow ensures that you always have access to your most up-to-dat
 ## Configuration
 
    - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually.
-
-   - If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades-using-id-and-password` command with the new password.
-     
-   - If you add/drop/withdraw courses, you can force the application to add the new courses or remove the dropped/withdrawn courses by re-running either of the `get-grade` commands.
+   - The `Laravel_Session` value in `config.json` is no longer modifiable via command. Previously, users could log in by directly providing the session cookie, but this is no longer supported due to the expiration date now embedded in the cookie. Instead, the login process uses the student ID and password via Selenium to retrieve and store a valid session token.
+   - If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
