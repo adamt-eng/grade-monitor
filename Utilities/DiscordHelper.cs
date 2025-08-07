@@ -1,99 +1,146 @@
-﻿using System;
+﻿using Discord;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Discord;
+using Discord.WebSocket;
 
 namespace Grade_Monitor.Utilities;
 
 internal static class DiscordHelper
 {
-    internal static ButtonBuilder CreateRefreshButton() => new ButtonBuilder().WithLabel("Refresh").WithStyle(ButtonStyle.Secondary).WithEmote(new Emoji("\ud83d\udd04")).WithCustomId("refresh");
-
-    internal static MessageComponent CreateMessageComponent(HashSet<string> semesters, string requestedSemester, bool heavyLoad)
+    internal static void EnsureCommandsExist(DiscordSocketClient client)
     {
-        var selectSemesterMenuOptions = new List<SelectMenuOptionBuilder>();
-
-        // Sort the semesters in chronological order
-        var orderedSemesters = semesters.OrderBy(static s =>
+        var getGradesCommandExists = client.GetGlobalApplicationCommandsAsync().Result.Any(command => command.Name == "get-grades");
+        if (!getGradesCommandExists)
         {
-            var semester = s.Split(' ');
-
-            var season = semester[0];
-            var year = int.Parse(semester[1]);
-
-            // Assign a numerical value to each season for proper ordering
-            var seasonOrder = season switch
+            var globalCommand = new SlashCommandBuilder
             {
-                "Spring" => 0,
-                "Summer" => 1,
-                "Fall" => 2,
-                _ => throw new ArgumentOutOfRangeException(nameof(s))
+                Name = "get-grades",
+                Description = "Get grades using student id and password."
             };
 
-            // Combine year and season order
-            return year * 3 + seasonOrder;
-        }).ToList();
+            globalCommand.AddOptions
+            (
+                new SlashCommandOptionBuilder
+                {
+                    Name = "student-id",
+                    Description = "Please type your student id.",
+                    Type = ApplicationCommandOptionType.String,
+                    IsRequired = true
+                },
+                new SlashCommandOptionBuilder
+                {
+                    Name = "password",
+                    Description = "Please type your password.",
+                    Type = ApplicationCommandOptionType.String,
+                    IsRequired = true
+                }
+            );
 
-        // Add each semester as a selectable option to selectSemesterMenuOptions
-        foreach (var semester in orderedSemesters)
-        {
-            selectSemesterMenuOptions.Add(new SelectMenuOptionBuilder
-            {
-                Label = semester,
-                Value = semester,
-                Emote = semester.Contains("Summer") ? new Emoji("☀️") : semester.Contains("Spring") ? new Emoji("🌸") : new Emoji("🍂"),
-                IsDefault = semester == requestedSemester
-            });
+            client.CreateGlobalApplicationCommandAsync(globalCommand.Build());
         }
 
-        // Create the select menu; select-semester using the previously set selectSemesterMenuOptions
-        var selectSemesterMenu = new SelectMenuBuilder
+        var updateIntervalCommandExists = client.GetGlobalApplicationCommandsAsync().Result.Any(command => command.Name == "update-interval");
+        if (!updateIntervalCommandExists)
         {
-            CustomId = "select-semester",
-            MinValues = 1,
-            MaxValues = 1,
-            Options = selectSemesterMenuOptions
-        };
+            var globalCommand = new SlashCommandBuilder
+            {
+                Name = "update-interval",
+                Description = "Set how often your grades are refreshed automatically."
+            };
 
-        // Create the select menu; select-load
-        var selectLoadMenu = new SelectMenuBuilder
-        {
-            CustomId = "select-load",
-            MinValues = 1,
-            MaxValues = 1,
-            Options =
-            [
-                new SelectMenuOptionBuilder
+            globalCommand.AddOptions
+            (
+                new SlashCommandOptionBuilder
                 {
-                    Label = "Heavy Load",
-                    Value = "Heavy Load",
-                    Description = "Use when faculty servers are under heavy load",
-                    Emote = new Emoji("\ud83d\udd34"),
-                    IsDefault = heavyLoad
+                    Name = "normal-interval",
+                    Description = "Interval (in minutes) to refresh your grades under normal conditions.",
+                    Type = ApplicationCommandOptionType.Integer,
+                    IsRequired = true,
+                    MinValue = 5
                 },
-                new SelectMenuOptionBuilder
+                new SlashCommandOptionBuilder
                 {
-                    Label = "Normal Load",
-                    Value = "Normal Load",
-                    Description = "Use for detailed course grades",
-                    Emote = new Emoji("\ud83d\udfe2"),
-                    IsDefault = !heavyLoad
+                    Name = "interval-after-errors",
+                    Description = "Interval (in minutes) to retry refreshing grades after an error occurs.",
+                    Type = ApplicationCommandOptionType.Integer,
+                    IsRequired = true,
+                    MinValue = 1
                 }
-            ]
-        };
+            );
 
-        // Return the component builder containing:
-        // the select-semester select menu
-        // the select-load select menu
-        // the refresh button
-        return new ComponentBuilder
+            client.CreateGlobalApplicationCommandAsync(globalCommand.Build());
+        }
+    }
+
+    private static ButtonBuilder RefreshGradesButton() => new ButtonBuilder().WithLabel("Refresh Grades").WithStyle(ButtonStyle.Secondary).WithEmote(new Emoji("\ud83d\udd04")).WithCustomId("refresh-grades");
+    private static ButtonBuilder RefetchCoursesButton() => new ButtonBuilder().WithLabel("Refetch Courses").WithStyle(ButtonStyle.Secondary).WithEmote(new Emoji("\ud83d\udd04")).WithCustomId("refetch-courses");
+
+    internal static MessageComponent CreateMessageComponent() => CreateMessageComponent(semesters: null, requestedSemester: null, fetchFinalGradesOnly: false);
+    internal static MessageComponent CreateMessageComponent(HashSet<string> semesters, string requestedSemester, bool fetchFinalGradesOnly)
+    {
+        var builder = new ComponentBuilder();
+
+        if ((semesters != null || requestedSemester != null) && semesters is { Count: > 0 })
         {
-            ActionRows =
-            [
-                new ActionRowBuilder().WithSelectMenu(selectSemesterMenu),
-                new ActionRowBuilder().WithSelectMenu(selectLoadMenu),
-                new ActionRowBuilder().WithButton(CreateRefreshButton())
-            ]
-        }.Build();
+            var selectSemesterMenu = new SelectMenuBuilder
+            {
+                CustomId = "select-semester",
+                MinValues = 1,
+                MaxValues = 1,
+                Options = [.. semesters.OrderBy(semester =>
+                {
+                    var semesterSplit = semester.Split(' ');
+                    
+                    return int.Parse(semesterSplit[1]) * 3 + semesterSplit[0] switch
+                    {
+                        "Spring" => 0,
+                        "Summer" => 1,
+                        "Fall" => 2,
+                        _ => throw new ArgumentOutOfRangeException(nameof(semester))
+                    };
+                })
+                .Select(semester => new SelectMenuOptionBuilder
+                {
+                    Label = semester,
+                    Value = semester,
+                    Emote = semester.Contains("Summer") ? new Emoji("☀️") : semester.Contains("Spring") ? new Emoji("🌸") : new Emoji("🍂"),
+                    IsDefault = semester == requestedSemester
+                })]
+            };
+
+            var selectModeMenu = new SelectMenuBuilder
+            {
+                CustomId = "select-mode",
+                MinValues = 1,
+                MaxValues = 1,
+                Options =
+                [
+                    new SelectMenuOptionBuilder
+                    {
+                        Label = "Mode 1: Final Grades",
+                        Value = "Mode 1: Final Grades",
+                        Description = "Fetches only final course grade. This can be faster as it visits fewer pages.",
+                        Emote = new Emoji("\ud83d\udd34"),
+                        IsDefault = fetchFinalGradesOnly
+                    },
+                    new SelectMenuOptionBuilder
+                    {
+                        Label = "Mode 2: All Grades",
+                        Value = "Mode 2: All Grades",
+                        Description = "Fetches all course grades such as final, midterm, activities, etc.",
+                        Emote = new Emoji("\ud83d\udfe2"),
+                        IsDefault = !fetchFinalGradesOnly
+                    }
+                ]
+            };
+
+            builder.AddRow(new ActionRowBuilder().WithSelectMenu(selectSemesterMenu));
+            builder.AddRow(new ActionRowBuilder().WithSelectMenu(selectModeMenu));
+        }
+
+        builder.AddRow(new ActionRowBuilder().WithButton(RefreshGradesButton()).WithButton(RefetchCoursesButton()));
+
+        return builder.Build();
     }
 }
