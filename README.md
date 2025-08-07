@@ -89,9 +89,9 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ## :wrench: Configuration
 
-  - The config file `config.json` stores user credentials and application settings. **Do not edit manually.**
-  - The `Laravel_Session` value in `config.json` is no longer modifiable via command. Previously, users could log in by directly providing the session cookie, but this is no longer supported due to the expiration date now embedded in the cookie. Instead, the login process uses the student ID and password via Selenium to retrieve and store a valid session token.
-  - If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
+- The config file `config.json` stores user credentials and application settings. **Do not edit manually.**
+- The `Laravel_Session` value in `config.json` is no longer modifiable via command. Previously, users could log in by directly providing the session cookie, but this is no longer supported due to the expiration date now embedded in the cookie. Instead, the login process uses the student ID and password via Selenium to retrieve and store a valid session token.
+- If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
 
 ---
 
@@ -99,20 +99,20 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ### :one: Create a Discord Bot
 
-* Visit the [Discord Developer Portal](https://discord.com/developers/applications).
-* Create a new application and enable the following scopes:
+- Visit the [Discord Developer Portal](https://discord.com/developers/applications).
+- Create a new application and enable the following scopes:
 
-  * `bot`
-  * `applications.commands`
-* Copy your **Bot Token**.
-* Invite the bot to your server using the OAuth2 URL.
+  - `bot`
+  - `applications.commands`
+- Copy your **Bot Token**.
+- Invite the bot to your server using the OAuth2 URL.
 
 ---
 
 ### :two: Get an API Key from SolveCaptcha
 
-* Go to [https://solvecaptcha.com](https://solvecaptcha.com) and register an account.
-* From the **Dashboard**, find and copy your **API Key** for use in the application.
+- Go to [https://solvecaptcha.com](https://solvecaptcha.com) and register an account.
+- From the **Dashboard**, find and copy your **API Key** for use in the application.
 
 ---
 
