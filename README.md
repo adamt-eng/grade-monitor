@@ -1,46 +1,21 @@
-## Grade Monitor For Faculty of Engineering - Ain Shams University
+## :mortar_board: Grade Monitor For Faculty of Engineering - Ain Shams University
 
-An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
+An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. Supports semester selection, robust retry logic for server downtimes, and session management for faster grade access.
 
-## Used Technologies
+## :toolbox: Used Technologies
 
 - **.NET 9 (C#):** Core framework for building and running the application logic.
 - **Selenium WebDriver:** Used to automate browser interactions for login and reCAPTCHA solving.
-- **SolveCaptcha API:** Used to programmatically solve Google reCAPTCHA v2 challenges.
-- **Json.NET (Newtonsoft.Json):** For parsing and handling JSON configurations and API responses.
-- **CookieContainer (System.Net):** Maintains session cookies between HTTP requests for persistent login sessions.
+- **SolveCaptcha API:** Automatically solves reCAPTCHA v2 challenges.
+- **Json.NET (Newtonsoft.Json):** Handles JSON config files and API responses.
+- **CookieContainer (System.Net):** Stores and manages session cookies across HTTP requests.
 - **Discord.Net:** A C# wrapper for the Discord API, enabling bot interaction, slash commands, and message handling.
 
-## Showcase
-![Showcase](Showcase.gif)
+## :sparkles: Features
 
-## Features
+### :closed_lock_with_key: Login
 
-- **Automatic Grade Retrieval:** The app logs in and retrieves the user's grades from the relevant pages on the faculty portal, sending the results directly to the user in a private message.
-
-- **Semester Selection:** Users can select different semesters to view grades from previous terms. The current semester is selected by default, but users have the flexibility to choose any other available semester.
-
-- **Mode 1: Final Grades:** When faculty servers are under heavy load, this mode reduces the number of HTTP requests by retrieving only the final grades from the courses registration page. While it shows fewer details, it is particularly useful when awaiting final course grades.
-
-- **Mode 2: All Grades:** This mode fetches all course grades such as final, midterm, activities, etc.
-
-- **Refresh Grades Button:** Users can manually refresh the grades data to check for updates based on the current semester and load selection.
-
-- **Refresh Courses Button:** Users can use the `Refresh Courses` button to force refetching of their course data, this is particularly useful to remove/add courses that users have dropped/withdrawn/registered.
-
-- **Session Persistence:** The app uses a `CookieContainer` to manage session cookies. This allows it to maintain a session across multiple requests without needing to log in repeatedly, saving network resources and reducing the time taken to get grades.
-
-- **Retry Mechanism:** Given the frequent downtimes of the faculty website, the app employs a retry mechanism to ensure reliable grade retrieval. If a request fails, the app will use a shorter refresh interval to check for grades more frequently so that we're able to retrieve the grades as soon as the server is back up.
-
-- **Update Interval:** The app allows you to customize how frequently it fetches your grades. There are two interval settings: one for normal conditions, and another used as part of the retry mechanism, which activates after an error to refresh more frequently until recovery.
-
-- **CAPTCHA Solver:** The app includes a [reCAPTCHA solver](solvecaptcha.com) to automatically solve the `I'm not a robot` challenges that are on the login page of the faculty site.
-
-## Usage
-
-### 1. Get Grades
-
-- Use the `/get-grades` command to get your grades report. This command requires your student id and password.
+Use the `/get-grades` command to log in and retrieve your grades for the first time. You’ll need to provide your **Student ID** and **Password**.
 
 **Example:**
 
@@ -48,33 +23,42 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 /get-grades student-id:23P0001 password:tHiSiSmYpAsSwOrD
 ```
 
-### 2. Select Semester
+---
 
-- After the initial command execution, the bot will send a message with an interactive dropdown menu.
-  
-- Select the semester you want to view grades for from the menu, the current (or latest) semester is selected by default.
+### :books: Semester Selection
 
-### 3. Select Mode
+Choose which semester’s grades to view using the dropdown menu. By default, the most recent semester is selected.
 
-The bot provides an option to manage how grades are retrieved:
+---
 
-- **Mode 1: Final Grades:** Reduces the number of HTTP requests by retrieving only the final grades. Useful during peak times when the faculty servers are under heavy load.
+### :gear: Mode Selection
 
-- **Mode 2: All Grades:** Retrieves detailed course grades. This is the default setting.
+Choose between two grade-fetching modes to suit your needs:
 
-### 4. Refresh Grades
+- **Mode 1 – Final Grades:**
+  Fetches only final grades to reduce HTTP requests. Useful during peak times when the faculty servers are already under heavy load.
 
-To manually refresh and check for updated grades:
+- **Mode 2 – All Grades (Default):**
+  Retrieves all course grades such as final, midterm, activities, etc.
 
-- Click the `Refresh Grades` button.
+---
 
-- The bot will refresh the grade data based on the current semester and mode selection.
+### :arrows_counterclockwise: Manual Refresh Options
 
-### 5. Update Interval
+- **Refresh Grades Button:**
+  Manually refresh the grade data for the selected semester and mode.
 
-You can customize how often the app fetches your grades using the `/update-interval` command. This command allows you to set:
-- normal-interval: The interval (in minutes) used under normal conditions.
-- interval-after-errors: The interval (in minutes) used when an error occurs, allowing the app to retry more frequently until recovery.
+- **Refresh Courses Button:**
+  Force-refresh your course list. Useful if you’ve recently registered, dropped, or withdrawn from courses.
+
+---
+
+### :stopwatch: Custom Update Intervals
+
+Adjust how often the app checks for grade updates using the `/update-interval` command. You can configure:
+
+- `normal-interval`: Time (in minutes) between checks under normal conditions.
+- `interval-after-errors`: Time (in minutes) between checks when an error occurs, this is recommended to be lower than `normal-interval` to allow the app to retry more frequently until recovery.
 
 **Example:**
 
@@ -82,87 +66,95 @@ You can customize how often the app fetches your grades using the `/update-inter
 /update-interval normal-interval:60 interval-after-errors:5
 ```
 
-### 6. reCAPTCHA Solver
+---
 
-- **CAPTCHA Solver:** The app includes a [reCAPTCHA solver](solvecaptcha.com) to automatically solve the `I'm not a robot` challenges that are on the login page of the faculty site.
-- Because of this reCAPTCHA, the app now utilizes [Selenium](https://github.com/SeleniumHQ/selenium) **for the login process only**, to be able to load the reCAPTCHA, solve it, and return the response.
+## :gear: Technical Features
 
-## Setup Instructions
+* **:key: Login via Selenium:**
+  Uses [Selenium](https://github.com/SeleniumHQ/selenium) only for the login process, allowing it to load and solve Google reCAPTCHA.
 
-### 1. **Create a Discord App**
+* **:robot: CAPTCHA Solver Integration:**
+  Solves “I’m not a robot” reCAPTCHA challenges on the faculty site automatically using [SolveCaptcha](https://solvecaptcha.com).
 
-- Create a new application from the [Discord Developer Portal](https://discord.com/developers/applications).
+* **:cookie: Session Persistence:**
+  Uses `CookieContainer` to store session cookies and reduce the need for repeated logins.
 
-- Application scopes must contain `application.commands` and `bot`.
+* **:repeat: Robust Retry System:**
+  Automatically switches to a shorter retry interval during faculty site downtime, so grades are retrieved as soon as the site comes back online.
 
-- Copy the bot's token; you'll need this later.
+> :warning: **Note:**
+> The app must remain running to monitor grades. Consider using a [VPS](https://cloud.google.com/learn/what-is-a-virtual-private-server) for 24/7 uptime or simply run it locally as needed.
 
-- Copy the bot's install link and use it to add the bot to your desired server.
+---
 
-### 2. **Get an API Key from SolveCaptcha**
+## :wrench: Configuration
 
-To enable automated CAPTCHA solving, follow these steps to register with SolveCaptcha and integrate it into the app:
+  - The config file `config.json` stores user credentials and application settings. **Do not edit manually.**
+  - The `Laravel_Session` value in `config.json` is no longer modifiable via command. Previously, users could log in by directly providing the session cookie, but this is no longer supported due to the expiration date now embedded in the cookie. Instead, the login process uses the student ID and password via Selenium to retrieve and store a valid session token.
+  - If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
 
-1. **Sign Up for an Account:** Go to [https://solvecaptcha.com](https://solvecaptcha.com) and create an account if you haven’t already.
+---
 
-2. **Generate an API Key**
-   - Once logged in, go to your **Dashboard**.
-   - Find your **API Key** under the API access section.
-   - Copy this key; you’ll need it later.
+## :rocket: Setup Instructions
 
-### 3. **Prerequisites**
+### :one: Create a Discord Bot
 
-- Ensure that you have [.NET 9.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) installed on your machine:
+* Visit the [Discord Developer Portal](https://discord.com/developers/applications).
+* Create a new application and enable the following scopes:
 
-- You can verify the .NET SDK installation by running:
+  * `bot`
+  * `applications.commands`
+* Copy your **Bot Token**.
+* Invite the bot to your server using the OAuth2 URL.
 
-  ```bash
-  dotnet --version
-  ```
+---
 
-### 4. **Download the Source Code**
+### :two: Get an API Key from SolveCaptcha
 
-- Clone this repository using the following command:
+* Go to [https://solvecaptcha.com](https://solvecaptcha.com) and register an account.
+* From the **Dashboard**, find and copy your **API Key** for use in the application.
 
-  ```bash
-  git clone https://github.com/adamt-eng/grade-monitor
-  ```
+---
 
-### 5. **Navigate to the Project Directory**
+### :three: Prerequisites
 
-- After cloning the repository, navigate into the project directory:
+Make sure you have [.NET 9.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) installed.
 
-  ```bash
-  cd grade-monitor
-  ```
+To verify installation:
 
-### 6. **Compile the Source Code**
+```bash
+dotnet --version
+```
 
-- Restore dependencies with the following command:
+---
 
-  ```bash
-  dotnet restore
-  ```
+### :four: Clone the Repository
 
-- Once dependencies are restored, compile the project using:
+```bash
+git clone https://github.com/adamt-eng/grade-monitor
+```
 
-  ```bash
-  dotnet build --configuration Release
-  ```
+---
 
-### 7. **Run the Application:**
+### :five: Navigate to the Project Directory
 
-- If the build is successful, you can run the application with:
+```bash
+cd grade-monitor
+```
 
-  ```bash
-  dotnet run
-  ```
+---
 
-> :warning: **Important Note:** 
-> For the application to continuously monitor grades, you must keep it running. You might consider using a [Virtual Private Server (VPS)](https://cloud.google.com/learn/what-is-a-virtual-private-server) to keep it running 24/7. Alternatively, you can run it locally on your machine whenever needed.
+### :six: Restore and Build the Project
 
-## Configuration
+```bash
+dotnet restore
+dotnet build --configuration Release
+```
 
-   - The bot's configuration, including user credentials, is stored in `config.json`. It is recommended not to modify this file manually.
-   - The `Laravel_Session` value in `config.json` is no longer modifiable via command. Previously, users could log in by directly providing the session cookie, but this is no longer supported due to the expiration date now embedded in the cookie. Instead, the login process uses the student ID and password via Selenium to retrieve and store a valid session token.
-   - If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
+---
+
+### :seven: Run the Application
+
+```bash
+dotnet run
+```
