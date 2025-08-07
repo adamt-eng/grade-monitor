@@ -1,23 +1,21 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using Discord;
+﻿using Discord;
 using Grade_Monitor.Configuration;
 using Grade_Monitor.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace Grade_Monitor.Core;
 
-internal partial class Session(User user)
+internal partial class Session
 {
     [GeneratedRegex(@"\b(Fall|Spring|Summer) \d{4}\b")] private static partial Regex SemesterRegex(); // Regular expression to identify semester names
 
     internal int Timer;
 
-    internal User User = user;
+    internal User User;
 
     internal string Cgpa; // User's CGPA, fetched from the dashboard
     internal string RequestedSemester; // The semester the user has selected
@@ -27,21 +25,26 @@ internal partial class Session(User user)
 
     internal int Fails; // Fail counter
 
-    internal bool HeavyLoad; // Indicates load type to determine if it will fetch detailed grades or only final grades for faster retrieval
+    internal bool FetchFinalGradesOnly;
     private bool _checkedFinalGrades; // Indicates whether we have checked for the final grades or not
 
-    private readonly CookieContainer _cookieContainer = new(); // Use CookieContainer to avoid repeated login requests 
-    private HttpClient _httpClient;
+    private readonly HttpHelper _httpHelper;
+
+    internal Session(User user)
+    {
+        User = user;
+        _httpHelper = new HttpHelper();
+    }
 
     internal async Task<bool> Login()
     {
-        // Initialize _httpClient if it didn't get initialized before
-        _httpClient ??= new HttpClient(new HttpClientHandler { UseProxy = false, CookieContainer = _cookieContainer });
-        
-        // Attempt to visit dashboard
-        var html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId).ConfigureAwait(false);
+        if (User.LaravelSession != null)
+        {
+            _httpHelper.SetCookie("https://eng.asu.edu.eg", $"laravel_session={User.LaravelSession}");
+            _httpHelper.SetCookie("https://eng.asu.edu.eg", $"asueng_web={User.LaravelSession}");
+        }
 
-        // If my_courses is accessible; user is already logged in
+        var html = await _httpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", User.DiscordUserId).ConfigureAwait(false);
         if (html.Contains("my_courses"))
         {
             Program.WriteLog($"{User.DiscordUserId}: Stored session found, reusing cookies.", ConsoleColor.Magenta);
@@ -50,83 +53,65 @@ internal partial class Session(User user)
         {
             Program.WriteLog($"{User.DiscordUserId}: No stored session, initiating login.", ConsoleColor.Red);
 
-            var isAlternateVersion = html.Contains("email1");
-            var content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                { "_token", html.ExtractBetween("token\" content=\"", "\"", lastIndexOf: false) },
-                { isAlternateVersion ? "email1" : "email", $"{User.StudentId}@eng.asu.edu.eg" },
-                { isAlternateVersion ? "password1" : "password", User.Password }
-            });
+            var pageName = "login";
+            var emailField = "email";
+            var passwordField = "password";
 
-            using var response = await _httpClient.PostAsync(isAlternateVersion ? "https://eng.asu.edu.eg/log1n" : "https://eng.asu.edu.eg/login", content).ConfigureAwait(false);
-
-            if (!response.IsSuccessStatusCode)
+            if (html.Contains("email1"))
             {
-                throw new Exception("Faculty server is currently down.");
+                pageName = "log1n";
+                emailField = "email1";
+                passwordField = "password1";
             }
 
-            html = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            html = await SeleniumHelper.FetchPage($"https://eng.asu.edu.eg/{pageName}", User.DiscordUserId);
+
+            SeleniumHelper.FillTextField(emailField, $"{User.StudentId}@eng.asu.edu.eg");
+            SeleniumHelper.FillTextField(passwordField, User.Password);
+
+            // If CAPTCHA is detected, solve it before submitting
+            if (html.Contains("recaptcha"))
+            {
+                Program.WriteLog($"{User.DiscordUserId}: CAPTCHA detected. Solving...", ConsoleColor.Yellow);
+
+                CaptchaSolver.SolveRecaptcha(pageName);
+            }
+
+            // Submit the login form
+            html = SeleniumHelper.SubmitLoginForm();
 
             // If my_courses is still not accessible
             if (!html.Contains("my_courses"))
             {
                 // Filling questionnaire is required.
-                if (html.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
+                if (html.Contains("Questionnaire"))
                 {
-                    // Prompts user to visit faculty site to fill the questionnaire.
                     throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
                 }
 
-                // Incorrect email, password, or solving CAPTCHA is required.
-                if (html.Contains("alert alert-danger"))
-                {
-                    // Incorrect email or password.
-                    if (!html.Contains("recaptcha"))
-                    {
-                        // Incorrect email or password.
-                        throw new Exception("Incorrect Student ID or password. Please check your credentials and try again.");
-                    }
-
-                    // Solving CAPTCHA is required.
-                    Program.WriteLog($"{User.DiscordUserId}: CAPTCHA required; attempting login with 'laravel_session' cookie.", ConsoleColor.Yellow);
-
-                    if (User.LaravelSession == null)
-                    {
-                        // Prompts user to use the get-grades-using-session-cookie
-                        throw new Exception("Login attempt using email and password has failed due to a CAPTCHA. Please use the `/get-grades-using-session-cookie` command.");
-                    }
-
-                    _cookieContainer.SetCookies(new Uri("https://eng.asu.edu.eg"), $"laravel_session={User.LaravelSession}");
-                    _cookieContainer.SetCookies(new Uri("https://eng.asu.edu.eg"), $"asueng_web={User.LaravelSession}");
-
-                    html = await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", _httpClient, User.DiscordUserId);
-
-                    // If my_courses is still not accessible
-                    if (!html.Contains("my_courses"))
-                    {
-                        // Filling questionnaire is required.
-                        if (html.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Prompts user to visit faculty site to fill the questionnaire.
-                            throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
-                        }
-
-                        throw new Exception("The 'laravel_session' cookie has expired. Please update it's value using the `/get-grades-using-session-cookie` command.");
-                    }
-                }
+                Console.WriteLine(html);
+                throw new Exception("Login failed: CAPTCHA might be invalid or credentials are incorrect.");
             }
 
-            Program.WriteLog($"{User.DiscordUserId}: Logged in successfully.", ConsoleColor.Magenta);
+            var cookies = SeleniumHelper.GetCookies();
+
+            _httpHelper.SetCookies(cookies);
+
+            var laravelSession = cookies.First(c => c.Name is "asueng_web" or "laravel_session").Value;
+            Program.Configuration.Users.First(x => x.DiscordUserId == User.DiscordUserId).LaravelSession = laravelSession;
+            Program.ConfigurationManager.Save(Program.Configuration);
         }
 
-        // Extract CGPA from dashboard
+        Program.WriteLog($"{User.DiscordUserId}: Logged in successfully.", ConsoleColor.Magenta);
+
         Cgpa = html.ExtractBetween("\"text-white\">", "<", lastIndexOf: false);
+
         return true;
     }
 
     internal async Task InitializeMembers(IUserMessage message)
     {
-        _studentCourses = await HttpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", _httpClient, User.DiscordUserId).ConfigureAwait(false);
+        _studentCourses = await _httpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", User.DiscordUserId).ConfigureAwait(false);
 
         // Filling questionnaire is required.
         if (_studentCourses.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
@@ -157,7 +142,7 @@ internal partial class Session(User user)
             }
         }
 
-        // If semester not specified; it is only specified when it's changed with select-load option
+        // If semester not specified; it is only specified when it's changed with select-mode option
         // Otherwise it's fetched with the following:
         if (RequestedSemester == null)
         {
@@ -180,7 +165,7 @@ internal partial class Session(User user)
 
     internal async Task<SortedDictionary<string, string>> FetchGradesReport()
     {
-        if (HeavyLoad && !_checkedFinalGrades)
+        if (FetchFinalGradesOnly && !_checkedFinalGrades)
         {
             return await FetchOnlyFinalGradesAsync().ConfigureAwait(false);
         }
@@ -232,7 +217,7 @@ internal partial class Session(User user)
             {
                 var gradeDetails = new List<string>();
 
-                var htmlLines = (await HttpHelper.FetchPage(course.Value, _httpClient, User.DiscordUserId).ConfigureAwait(false)).Split('\n');
+                var htmlLines = (await _httpHelper.FetchPage(course.Value, User.DiscordUserId).ConfigureAwait(false)).Split('\n');
                 var filteredHtmlLines = htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
 
                 // This case can occur when the link for the course is updated and the saved one now redirects
@@ -241,8 +226,8 @@ internal partial class Session(User user)
                 if (filteredHtmlLines.Count == 0)
                 {
                     await RefreshCoursesUrls(courses).ConfigureAwait(false);
-                    htmlLines = (await HttpHelper.FetchPage(courses[course.Key], _httpClient, User.DiscordUserId).ConfigureAwait(false)).Split('\n');
-                    filteredHtmlLines = htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
+                    htmlLines = (await _httpHelper.FetchPage(courses[course.Key], User.DiscordUserId).ConfigureAwait(false)).Split('\n');
+                    filteredHtmlLines = [.. htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2))];
                 }
 
                 for (var i = 0; i < filteredHtmlLines.Count; ++i)
@@ -332,10 +317,10 @@ internal partial class Session(User user)
         if (_currentSemester == RequestedSemester)
         {
             // Read my_courses page HTML and transform the page into an array with each line as an element
-            var myCourses = (await HttpHelper.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", _httpClient, User.DiscordUserId).ConfigureAwait(false)).Split('\n');
+            var myCourses = (await _httpHelper.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", User.DiscordUserId).ConfigureAwait(false)).Split('\n');
 
             // Filter the array to only contain the relevant courses
-            myCourses = myCourses.Where(line => line.Contains(_currentSemester)).ToArray();
+            myCourses = [.. myCourses.Where(line => line.Contains(_currentSemester))];
 
             // Get the course's name and url and add it to the configuration
             foreach (var line in myCourses)
