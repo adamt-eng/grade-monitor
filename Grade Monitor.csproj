@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <TargetFramework>net9.0-windows10.0.17763.0</TargetFramework>
 	<PublishSingleFile>true</PublishSingleFile>
     <RootNamespace>Grade_Monitor</RootNamespace>
     <NoWin32Manifest>true</NoWin32Manifest>
@@ -19,8 +19,6 @@
     <Platforms>AnyCPU;x64</Platforms>
     <Nullable>disable</Nullable>
     <PublishAot>False</PublishAot>
-    <PublishTrimmed>True</PublishTrimmed>
-	<TrimMode>partial</TrimMode>
 	<ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
 	<Configurations>Debug;Release;Publish Release</Configurations>
   </PropertyGroup>
@@ -62,7 +60,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Discord.Net" Version="3.17.1" />
+    <PackageReference Include="Discord.Net" Version="3.18.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Selenium.WebDriver" Version="4.34.0" />
+    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="139.0.7258.6600" />
+    <PackageReference Include="solvecaptcha-csharp" Version="1.0.2" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent" Condition="'$(ConfigurationName)' == 'Publish Release'">
