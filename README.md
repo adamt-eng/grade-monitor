@@ -1,4 +1,4 @@
-# Grade Monitor For Faculty of Engineering - Ain Shams University
+## Grade Monitor For Faculty of Engineering - Ain Shams University
 
 An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. The app allows users to select different semesters and refresh grade data efficiently. It is designed with robust retry mechanisms to handle server downtimes and uses cookies to maintain sessions for faster access.
 
