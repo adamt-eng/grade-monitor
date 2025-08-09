@@ -40,70 +40,58 @@ internal class Program
             // Acknowledge this interaction
             await socketSlashCommand.DeferAsync(ephemeral: true).ConfigureAwait(false);
 
-            var dataOptions = socketSlashCommand.Data.Options.ToList();
-            var option1 = dataOptions[0].Value;
-            var option2 = dataOptions[1].Value;
+            var commandParameters = socketSlashCommand.Data.Options.ToList();
+            var param1 = commandParameters[0].Value;
+            var param2 = commandParameters[1].Value;
 
-            if (socketSlashCommand.Data.Name == "update-interval")
+            Timer.Stop();
+
+            switch (socketSlashCommand.CommandName)
             {
-                Timer.Stop();
+                case "update-interval":
+                {
+                    Configuration.TimerIntervalInMinutes = Convert.ToInt32(param1);
+                    Configuration.TimerIntervalAfterExceptionsInMinutes = Convert.ToInt32(param2);
 
-                Configuration.TimerIntervalInMinutes = Convert.ToInt32(option1);
-                Configuration.TimerIntervalAfterExceptionsInMinutes = Convert.ToInt32(option2);
-                ConfigurationManager.Save(Configuration);
+                    // Update config.json
+                    ConfigurationManager.Save(Configuration);
 
-                Sessions.Clear();
+                    await socketSlashCommand.FollowupAsync("Intervals updated successfully.", ephemeral: true).ConfigureAwait(false);
+                    break;
+                }
+                case "get-grades":
+                {
+                    var discordUserId = socketSlashCommand.User.Id;
 
-                Timer.Start();
+                    Sessions.TryGetValue(discordUserId, out var session);
 
-                await socketSlashCommand.FollowupAsync("Intervals updated successfully.", ephemeral: true).ConfigureAwait(false);
+                    // Session being null indicates that the user was not registered to the app
+                    // and thus their data is not saved in config.json
+                    var user = session == null ? new User { DiscordUserId = discordUserId } : session.User;
+
+                    // Save/update user information
+                    user.StudentId = param1.ToString();
+                    user.Password = param2.ToString();
+
+                    // Add user to configuration
+                    if (session == null)
+                    {
+                        Configuration.Users.Add(user);
+                    }
+
+                    // Update config.json
+                    ConfigurationManager.Save(Configuration);
+
+                    await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
+
+                    await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
+                    break;
+                }
             }
-            else if (socketSlashCommand.Data.Name == "get-grades")
-            {
-                Timer.Stop();
 
-                var discordUserId = socketSlashCommand.User.Id;
+            Sessions.Clear();
 
-                Sessions.TryGetValue(discordUserId, out var session);
-
-                User user;
-                // Session being null indicates that the user was not registered to the app
-                // and thus their data is not saved in config.json
-                if (session == null)
-                {
-                    user = new User { DiscordUserId = discordUserId };
-                }
-                else
-                {
-                    user = session.User;
-                    user.Semesters.Clear(); // Clearing semesters forces the app to refetch them
-                }
-
-                // Save user information
-                if (socketSlashCommand.CommandName == "get-grades")
-                {
-                    user.StudentId = option1.ToString();
-                    user.Password = option2.ToString();
-                }
-
-                // Add user to configuration
-                if (session == null)
-                {
-                    Configuration.Users.Add(user);
-                }
-
-                // Update config.json
-                ConfigurationManager.Save(Configuration);
-
-                // Initialize new session and store it
-                Sessions[discordUserId] = new Session(user: user);
-
-                await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
-
-                await GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
-
-                Timer.Start();
-            }
+            Timer.Start();
         };
 
         Client.SelectMenuExecuted += async socketMessageComponent =>
@@ -159,7 +147,7 @@ internal class Program
                         break;
                     }
 
-                    // Clear stored semester data to force the application to refetch them
+                    // Clear stored semester data to force the application to refetch all semesters and courses
                     // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
                     session.User.Semesters.Clear();
 
