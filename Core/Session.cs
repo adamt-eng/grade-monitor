@@ -23,7 +23,6 @@ internal partial class Session
     internal string RequestedSemester; // The semester the user has selected
 
     private string _studentCourses; // The 'Student Courses' page source
-    private string _currentSemester; // The name of the current semester
 
     internal int Fails; // Fail counter
 
@@ -31,6 +30,11 @@ internal partial class Session
     private bool _fetchedFinalGrades;
 
     private readonly HttpHelper _httpHelper;
+
+    // Lazily gets the current semester name from _studentCourses.
+    // The value is extracted only on first access and then cached in _currentSemester.
+    private string _currentSemester;
+    private string CurrentSemester => _currentSemester ??= _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
     internal Session(User user)
     {
@@ -126,8 +130,6 @@ internal partial class Session
     internal async Task LoadStudentData()
     {
         await LoadStudentCourses().ConfigureAwait(false);
-
-        ExtractCurrentSemester();
 
         // Trim the HTML source to only the relevant section
         _studentCourses = _studentCourses.ExtractBetween("<div class=\"row gutters ComBody\">", "<div class=\"row gutters ComBody\">");
@@ -273,13 +275,13 @@ internal partial class Session
 
         // The current semester's course urls are fetched from the my_courses page
         // They are available on student_courses too, but they are loaded with AJAX which will require Selenium which is much slower than HttpClient
-        if (_currentSemester == RequestedSemester)
+        if (CurrentSemester == RequestedSemester)
         {
             // Read my_courses page HTML and transform the page into an array with each line as an element
             var myCourses = (await _httpHelper.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", User.DiscordUserId).ConfigureAwait(false)).Split('\n');
 
             // Filter the array to only contain the relevant courses
-            myCourses = [.. myCourses.Where(line => line.Contains(_currentSemester))];
+            myCourses = [.. myCourses.Where(line => line.Contains(CurrentSemester))];
 
             // Add course data to the configuration file
             foreach (var line in myCourses)
@@ -287,7 +289,7 @@ internal partial class Session
                 var courseName = line.ExtractBetween(">", " (");
                 var courseUrl = line.ExtractBetween("\"", "?");
 
-                AddCourseToConfiguration(_currentSemester, courseName, courseUrl);
+                AddCourseToConfiguration(CurrentSemester, courseName, courseUrl);
 
                 // Also add it to the courses Dictionary as it will be used in FetchGradesReport()
                 courses[courseName] = courseUrl;
@@ -363,11 +365,6 @@ internal partial class Session
         }
     }
 
-    private void ExtractCurrentSemester()
-    {
-        // Get the current semester name
-        _currentSemester = _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
-    }
 
     private void ExtractAndStoreUserSemesters()
     {
@@ -393,7 +390,7 @@ internal partial class Session
             if (message == null)
             {
                 // If no previous message found, set RequestedSemester to the current semester name
-                RequestedSemester = _currentSemester;
+                RequestedSemester = CurrentSemester;
             }
             else
             {
