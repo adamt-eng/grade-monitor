@@ -128,7 +128,7 @@ internal class Program
                     }
                 case "select-mode":
                     {
-                        Sessions[discordUserId].FetchFinalGradesOnly = selection == "Mode 1: Final Grades";
+                        Sessions[discordUserId].FetchFinalGrades = selection == "Mode 1: Final Grades";
                         break;
                     }
             }
@@ -253,60 +253,64 @@ internal class Program
     {
         try
         {
-            // New line to separate events
-            Console.WriteLine();
-
             // Log interaction
-            WriteLog($"{discordUserId}: {interactionType}", ConsoleColor.Cyan);
+            WriteLog($"\n{discordUserId}: {interactionType}", ConsoleColor.Cyan);
 
-            // Stopwatch to keep track of how fast we're reading grades
+            // Stopwatch to keep track of how fast grades are being fetched
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
             // Get the DM channel between the user and the bot
             var user = await Client.GetUserAsync(discordUserId).ConfigureAwait(false);
             var dmChannel = await user.CreateDMChannelAsync().ConfigureAwait(false);
+
+            // Get all messages in the DM channel
             var messages = (await dmChannel.GetMessagesAsync().FlattenAsync().ConfigureAwait(false)).ToList();
 
+            // Filter to only messages sent from the bot, this is to avoid bugs caused by the user sending messages in the DM channel
+            messages = [.. messages.Where(m => m.Author.Id == 1227871966057205841)];
+
+            // The DM channel should contain only one message.
+            // This message will be stored in:
             IUserMessage message = null;
+
+            // That message must contain exactly one embed with the grades.
+            // The embed will be stored in:
             EmbedBuilder previousEmbedBuilder = null;
 
-            // If there was a previous message sent between the user and the bot
+            // If these conditions aren’t met, message remains null and will be handled after this block.
             if (messages.Count == 1)
             {
+                // Get the message
                 message = (IUserMessage)messages.First();
 
-                // Store the embed builder from that message (previousEmbedBuilder)
-                // The previousEmbedBuilder contains the last saved grades which we need to detect if grades were updated
+                // If the message contains exactly one embed, store it for comparison.
+                // This embed holds the last known grades to detect changes later.
                 if (message.Embeds.Count == 1)
                 {
                     previousEmbedBuilder = message.Embeds.First().ToEmbedBuilder();
                 }
-                // If it doesn't have an embed then that indicates that an error has occurred while logging in or accessing faculty site
-                // Set message to null (explained later)
+                // If no embed is found, treat it as an error by setting message = null so it can be handled after this block.
                 else
                 {
                     message = null;
                 }
             }
 
-            // message will be null only if one of two things happened:
-            // 1. An error has occurred while logging in or accessing faculty site
-            // 2. There was more than one message in the DM channel (not supposed to happen except due to misusage of the app)
+            // message will be null if:
+            // 1. An error occurred while logging in or accessing the faculty site.
+            // 2. The DM channel contained more than one message from the bot (can only happen if the app is misused).
+            // Regardless of the reason, if message == null all messages sent by the bot will be deleted to force a new message with no bugs to be sent
             if (message == null)
             {
-                // Delete all messages in the DM channel
+                // Delete all messages sent by the bot in the DM channel
                 foreach (var item in messages)
                 {
-                    if (item.Author.Id == 1227871966057205841)
-                    {
-                        await item.DeleteAsync().ConfigureAwait(false);
-                    }
+                    await item.DeleteAsync().ConfigureAwait(false);
                 }
             }
-            // If message was null, a new message is sent regardless of if the grades were updated
 
-            // Get specified user session
+            // Get user session
             var session = Sessions[discordUserId];
 
             try
@@ -314,7 +318,7 @@ internal class Program
                 // Attempt login
                 if (await session.Login().ConfigureAwait(false))
                 {
-                    await session.InitializeMembers(message).ConfigureAwait(false);
+                    await session.LoadStudentData(message).ConfigureAwait(false);
 
                     var gradesReport = await session.FetchGradesReport().ConfigureAwait(false);
 
@@ -342,7 +346,7 @@ internal class Program
                         Fields = embedFieldBuilders
                     };
 
-                    var components = DiscordHelper.CreateMessageComponent([.. session.User.Semesters.Keys], session.RequestedSemester, session.FetchFinalGradesOnly);
+                    var components = DiscordHelper.CreateMessageComponent([.. session.User.Semesters.Keys], session.RequestedSemester, session.FetchFinalGrades);
 
                     // If the call was from the timer and the embeds are identical (grades not changed)
                     // Or if the user changed their selection of semester or mode
@@ -379,10 +383,6 @@ internal class Program
             }
             catch (Exception exception)
             {
-                #if DEBUG
-                SeleniumHelper.DisposeDriver();
-                #endif
-
                 WriteLog($"{discordUserId}: Exception 1: {exception.Message}", ConsoleColor.Red);
 
                 if (exception.Message == "Faculty server is currently down." || exception.Message.Contains("FetchPage"))
