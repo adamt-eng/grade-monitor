@@ -254,7 +254,8 @@ internal class Program
         try
         {
             // Log interaction
-            WriteLog($"\n{discordUserId}: {interactionType}", ConsoleColor.Cyan);
+            Console.WriteLine();
+            WriteLog($"{discordUserId}: {interactionType}", ConsoleColor.Cyan);
 
             // Stopwatch to keep track of how fast grades are being fetched
             var stopwatch = new Stopwatch();
@@ -318,7 +319,9 @@ internal class Program
                 // Attempt login
                 if (await session.Login().ConfigureAwait(false))
                 {
-                    await session.LoadStudentData(message).ConfigureAwait(false);
+                    await session.LoadStudentData().ConfigureAwait(false);
+
+                    session.DetermineRequestedSemester(message);
 
                     var gradesReport = await session.FetchGradesReport().ConfigureAwait(false);
 

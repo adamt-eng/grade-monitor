@@ -115,6 +115,7 @@ internal partial class Session
             Program.ConfigurationManager.Save(Program.Configuration);
         }
 
+        // Extract cumulative GPA
         Cgpa = html.ExtractBetween("\"text-white\">", "<", lastIndexOf: false);
 
         Program.WriteLog($"{User.DiscordUserId}: Logged in successfully.", ConsoleColor.Magenta);
@@ -122,7 +123,7 @@ internal partial class Session
         return true;
     }
 
-    internal async Task LoadStudentData(IUserMessage message)
+    internal async Task LoadStudentData()
     {
         await LoadStudentCourses().ConfigureAwait(false);
 
@@ -132,7 +133,6 @@ internal partial class Session
         _studentCourses = _studentCourses.ExtractBetween("<div class=\"row gutters ComBody\">", "<div class=\"row gutters ComBody\">");
 
         ExtractAndStoreUserSemesters();
-        DetermineRequestedSemester(message);
     }
 
     internal async Task<SortedDictionary<string, string>> FetchGradesReport()
@@ -384,24 +384,22 @@ internal partial class Session
         }
     }
 
-    private void DetermineRequestedSemester(IUserMessage message)
+    internal void DetermineRequestedSemester(IUserMessage message)
     {
         // RequestedSemester is always == null EXCEPT for the call where
         // the user manually selected a semester using the select-semester menu
         if (RequestedSemester == null)
         {
-            // If no previous message found, set RequestedSemester to the current semester name
             if (message == null)
             {
+                // If no previous message found, set RequestedSemester to the current semester name
                 RequestedSemester = _currentSemester;
             }
             else
             {
                 // Else set it to the semester currently selected from the select-semester menu
-
                 var actionRows = message.Components.OfType<ActionRowComponent>();
                 var selectMenus = actionRows.SelectMany(row => row.Components.OfType<SelectMenuComponent>()).ToList();
-
                 RequestedSemester = selectMenus[0].Options.First(option => option.IsDefault == true).Value;
             }
         }
