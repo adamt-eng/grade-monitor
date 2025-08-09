@@ -354,7 +354,7 @@ internal class Program
                     // If the call was from the timer and the embeds are identical (grades not changed)
                     // Or if the user changed their selection of semester or mode
                     // Therefore, simply update the already sent message with the requested data
-                    if (message != null && (interactionType.Contains("SelectMenuExecuted") || interactionType == "OnTimerElapsed" && embedBuilder.IdenticalTo(previousEmbedBuilder)))
+                    if (message != null && (interactionType.Contains("SelectMenuExecuted") || interactionType == "OnTimerElapsed" && EmbedsIdentical(embedBuilder, previousEmbedBuilder)))
                     {
                         // Silently update the timestamp in the already sent message to indicate that the app is functioning as expected
                         await message.ModifyAsync(Update).ConfigureAwait(false);
@@ -382,6 +382,8 @@ internal class Program
 
                     // Reset fails counter
                     session.Fails = 0;
+
+                    static bool EmbedsIdentical(EmbedBuilder embed1, EmbedBuilder embed2) => embed1.Fields.Count == embed2.Fields.Count && embed1.Fields.All(field1 => field1.Value.ToString() == embed2.Fields.First(field2 => field2.Name == field1.Name).Value.ToString());
                 }
             }
             catch (Exception exception)

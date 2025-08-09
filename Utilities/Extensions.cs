@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Linq;
-using Discord;
 
 namespace Grade_Monitor.Utilities;
 
 internal static class Extensions
 {
-    internal static bool IdenticalTo(this EmbedBuilder embed1, EmbedBuilder embed2) => embed1.Fields.Count == embed2.Fields.Count && embed1.Fields.All(field1 => field1.Value.ToString() == embed2.Fields.First(field2 => field2.Name == field1.Name).Value.ToString());
     internal static string ExtractBetween(this string source, string start, string end, bool lastIndexOf = true)
     {
         int startIndex, endIndex;
