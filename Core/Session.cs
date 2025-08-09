@@ -11,11 +11,13 @@ namespace Grade_Monitor.Core;
 
 internal partial class Session
 {
+    private record Course(string FullName, string Semester, string Url, string Grade);
+
     [GeneratedRegex(@"\b(Fall|Spring|Summer) \d{4}\b")] private static partial Regex SemesterRegex(); // Regular expression to identify semester names
 
-    internal int Timer;
+    internal int Timer; // Timestamp at which this user's grades will be refreshed
 
-    internal User User;
+    internal User User; // The user associated with this session
 
     internal string Cgpa; // User's CGPA, fetched from the dashboard
     internal string RequestedSemester; // The semester the user has selected
@@ -125,6 +127,10 @@ internal partial class Session
         await LoadStudentCourses().ConfigureAwait(false);
 
         ExtractCurrentSemester();
+
+        // Trim the HTML source to only the relevant section
+        _studentCourses = _studentCourses.ExtractBetween("<div class=\"row gutters ComBody\">", "<div class=\"row gutters ComBody\">");
+
         ExtractAndStoreUserSemesters();
         DetermineRequestedSemester(message);
     }
@@ -243,45 +249,22 @@ internal partial class Session
     private async Task<SortedDictionary<string, string>> FetchFinalGradesAsync()
     {
         var grades = new SortedDictionary<string, string>();
-        var studentCourses = _studentCourses.Split(Environment.NewLine);
-        var i = 0;
 
-        while (i < studentCourses.Length)
+        foreach (var course in ParseStudentCourses().Where(course => course.Semester == RequestedSemester && !string.IsNullOrEmpty(course.Grade)))
         {
-            // If a course that's in the requested semester is found
-            if (studentCourses[i].Contains("<tr >") && studentCourses[i + 3].ExtractBetween(">", " <") == RequestedSemester)
-            {
-                // Extract course data
-                var courseCode = studentCourses[i + 1].ExtractBetween(">", "<");
-                var courseName = studentCourses[i + 2].ExtractBetween(">", "<");
-                var courseGrade = studentCourses[i + 4].ExtractBetween(">", "<");
-
-                // Add course data to the grades SortedDictionary
-                grades[$"{courseCode}: {courseName}"] = $"||**__Course Grade: {courseGrade}__**||";
-
-                // The distance between each line we need to read is 40 lines
-                // If the faculty changes this by the slightest, this whole logic breaks
-                // I have a backup plan if they decide to do that
-                i += 40;
-            }
-            else
-            {
-                // Else keep increasing by 1 to find the needed lines
-                ++i;
-            }
+            grades[course.FullName] = $"||**__Course Grade: {course.Grade}__**||";
         }
 
-        switch (grades.Count)
+        // If the count is 0, it indicates that final grades are not released yet for the requested semester
+        // So instead, fetch all grades for the requested semester
+        // Set _fetchedFinalGradesto true to avoid infinite calls to this function
+        if (grades.Count == 0)
         {
-            // If the count is 0, it indicates that final grades are not released yet for the requested semester
-            // So instead, fetch all grades for the requested semester
-            // Set _fetchedFinalGradesto true to avoid infinite calls to this function
-            case 0:
-                _fetchedFinalGrades = true;
-                return await FetchGradesReport().ConfigureAwait(false);
-            default:
-                return grades;
+            _fetchedFinalGrades = true;
+            return await FetchGradesReport().ConfigureAwait(false);
         }
+
+        return grades;
     }
 
     private async Task RefreshCoursesUrls(Dictionary<string, string> courses)
@@ -312,42 +295,10 @@ internal partial class Session
         }
         else
         {
-            var studentCourses = _studentCourses.Split(Environment.NewLine);
-
-            var i = 0;
-
-            while (i < studentCourses.Length)
+            foreach (var (courseName, semester, url, _) in ParseStudentCourses().Where(course => course.Semester == RequestedSemester))
             {
-                var line = studentCourses[i];
-
-                if (line.Contains("\"https://eng.asu.edu.eg/dashboard/"))
-                {
-                    var courseCode = studentCourses[i - 3].ExtractBetween(">", "<");
-                    var courseName = $"{courseCode}: {line.ExtractBetween(">", "<")}";
-                    var courseSemester = studentCourses[i + 6].ExtractBetween(">", "<").Trim();
-                    var courseUrl = line.ExtractBetween("\"", "\"");
-
-                    // Add course data to the configuration file
-                    AddCourseToConfiguration(courseSemester, courseName, courseUrl);
-
-                    // The program gets the grades for all the courses in the courses dictionary
-                    // And so we have to do the following condition to make sure only the requested ones are fetched
-                    if (courseSemester == RequestedSemester)
-                    {
-                        // Add course to the courses Dictionary as it will be used in FetchGradesReport()
-                        courses[courseName] = courseUrl;
-                    }
-
-                    // The distance between each line we need to read is 40 lines
-                    // If the faculty changes this by the slightest, this whole logic breaks
-                    // I have a backup plan if they decide to do that
-                    i += 40;
-                }
-                else
-                {
-                    // Else keep increasing by 1 to find the needed lines
-                    ++i;
-                }
+                AddCourseToConfiguration(semester, courseName, url);
+                courses[courseName] = url;
             }
         }
 
@@ -362,6 +313,40 @@ internal partial class Session
 
         // Update config.json
         Program.ConfigurationManager.Save(Program.Configuration);
+    }
+
+    private IEnumerable<Course> ParseStudentCourses()
+    {
+        // This function is extremely fragile and prone to bugs if even one line in the student_courses HTML page source changes
+        // The alternative is to use Selenium to navigate the page but that is much slower and is still fragile if anything changes on the page
+        // So while this approach is not future-proof, the faculty does not update
+        // the site frequently so it's the best method at the moment
+
+        var lines = _studentCourses.Split(Environment.NewLine);
+        var i = 0;
+
+        while (i < lines.Length)
+        {
+            if (lines[i].Contains("\"https://eng.asu.edu.eg/dashboard/"))
+            {
+                var courseUrl = lines[i].ExtractBetween("\"", "\"");
+
+                i += 24; // Jump 24 lines to reach the rest of the course data
+
+                var courseCode = lines[i].ExtractBetween(">", "<");
+                var courseName = lines[i + 1].ExtractBetween(">", "<");
+                var courseSemester = lines[i + 2].ExtractBetween(">", "<").Trim();
+                var courseGrade = lines[i + 3].ExtractBetween(">", "<");
+
+                yield return new Course($"{courseCode}: {courseName}", courseSemester, courseUrl, courseGrade);
+
+                i += 16; // Jump to the next course url
+            }
+            else
+            {
+                ++i; // Else keep increasing by 1 to find the needed lines
+            }
+        }
     }
 
     private async Task LoadStudentCourses()
