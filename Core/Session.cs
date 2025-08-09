@@ -201,7 +201,7 @@ internal partial class Session
             var gradeDetails = new List<string>();
 
             var htmlLines = (await _httpHelper.FetchPage(course.Value, User.DiscordUserId).ConfigureAwait(false)).Split('\n');
-            var filteredHtmlLines = htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2)).ToList();
+            var filteredHtmlLines = htmlLines.Where(ContainsGradeIdentifier).ToList();
 
             // This case can occur when the link for the course is updated and the saved one now redirects
             // to an error page that does not contain the keywords used for identifying the grades
@@ -210,7 +210,7 @@ internal partial class Session
             {
                 await RefreshCoursesUrls(courses).ConfigureAwait(false);
                 htmlLines = (await _httpHelper.FetchPage(courses[course.Key], User.DiscordUserId).ConfigureAwait(false)).Split('\n');
-                filteredHtmlLines = [.. htmlLines.Where(line => line.Contains(Constants.GradeIdentifier1) || line.Contains(Constants.GradeIdentifier2))];
+                filteredHtmlLines = [.. htmlLines.Where(ContainsGradeIdentifier)];
             }
 
             for (var i = 0; i < filteredHtmlLines.Count; ++i)
@@ -246,6 +246,8 @@ internal partial class Session
 
             grades[course.Key] = string.Join(Environment.NewLine, gradeDetails).Trim();
         }
+
+        static bool ContainsGradeIdentifier(string s) => s.Contains("text-align: right;") || s.Contains("7 col");
     }
 
     private async Task<SortedDictionary<string, string>> FetchFinalGradesAsync()
@@ -364,7 +366,6 @@ internal partial class Session
             throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
         }
     }
-
 
     private void ExtractAndStoreUserSemesters()
     {
