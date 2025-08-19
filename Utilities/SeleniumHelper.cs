@@ -4,6 +4,7 @@ using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading.Tasks;
 
 namespace Grade_Monitor.Utilities;
@@ -16,22 +17,30 @@ internal static class SeleniumHelper
 
     private static void InitializeDriver()
     {
-        if (_driver == null)
-        {
-            var options = new ChromeOptions();
-            options.AddArgument("--headless=new");
-            options.AddArgument("--window-size=1920,1080");
-            options.AddArgument("--disable-gpu");
-            options.AddArgument("--no-sandbox");
-            options.AddArgument("--disable-dev-shm-usage");
-            options.AddArgument("--disable-crash-reporter");
-            options.AddArgument("--disable-extensions");
-            options.AddArgument("--disable-in-process-stack-traces");
-            options.AddArgument("--log-level=3");
-            options.AddArgument("--disable-logging");
+        if (_driver != null) return;
 
-            _driver = new ChromeDriver(options);
-        }
+        var options = new ChromeOptions();
+        options.AddArgument("--headless=new");
+        options.AddArgument("--window-size=1920,1080");
+        options.AddArgument("--disable-gpu");
+        options.AddArgument("--no-sandbox");
+        options.AddArgument("--disable-dev-shm-usage");
+        options.AddArgument("--disable-crash-reporter");
+        options.AddArgument("--disable-extensions");
+        options.AddArgument("--disable-in-process-stack-traces");
+        options.AddArgument("--log-level=3");
+        options.AddArgument("--disable-logging");
+
+        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        var chromePath = Path.Combine(baseDir, "chrome-win64", "chrome.exe");
+        var chromedriverDir = Path.Combine(baseDir, "chromedriver-win64");
+
+        options.BinaryLocation = chromePath;
+
+        var service = ChromeDriverService.CreateDefaultService(chromedriverDir);
+        service.HideCommandPromptWindow = true;
+
+        _driver = new ChromeDriver(service, options);
     }
 
     internal static void FillTextField(string elementName, string text) => _driver.FindElement(By.Name(elementName)).SendKeys(text);
@@ -59,15 +68,23 @@ internal static class SeleniumHelper
 
     internal static Task<string> FetchPage(string url, ulong discordUserId)
     {
-        InitializeDriver();
+        try
+        {
+            InitializeDriver();
 
-        Program.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
+            Program.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
 
-        _driver!.Navigate().GoToUrl(url);
+            _driver!.Navigate().GoToUrl(url);
 
-        var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
-        wait.Until(webDriver => ((IJavaScriptExecutor)webDriver).ExecuteScript("return document.readyState")!.ToString() == "complete");
+            var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
+            wait.Until(webDriver => ((IJavaScriptExecutor)webDriver).ExecuteScript("return document.readyState")!.ToString() == "complete");
 
-        return Task.FromResult(_driver.PageSource);
+            return Task.FromResult(_driver.PageSource);
+        }
+        catch (Exception)
+        {
+            Program.WriteLog($"{discordUserId}: Exception (FetchPage - SeleniumHelper)", ConsoleColor.Red);
+            throw;
+        }
     }
 }
