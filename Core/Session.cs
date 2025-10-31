@@ -131,9 +131,6 @@ internal partial class Session
     {
         await LoadStudentCourses().ConfigureAwait(false);
 
-        // Trim the HTML source to only the relevant section
-        _studentCourses = _studentCourses.ExtractBetween("<div class=\"row gutters ComBody\">", "<div class=\"row gutters ComBody\">");
-
         ExtractAndStoreUserSemesters();
     }
 
