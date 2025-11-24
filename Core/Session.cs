@@ -383,20 +383,22 @@ internal partial class Session
     {
         // RequestedSemester is always == null EXCEPT for the call where
         // the user manually selected a semester using the select-semester menu
-        if (RequestedSemester == null)
+        if (RequestedSemester != null)
         {
-            if (message == null)
-            {
-                // If no previous message found, set RequestedSemester to the current semester name
-                RequestedSemester = CurrentSemester;
-            }
-            else
-            {
-                // Else set it to the semester currently selected from the select-semester menu
-                var actionRows = message.Components.OfType<ActionRowComponent>();
-                var selectMenus = actionRows.SelectMany(row => row.Components.OfType<SelectMenuComponent>()).ToList();
-                RequestedSemester = selectMenus[0].Options.First(option => option.IsDefault == true).Value;
-            }
+            return;
+        }
+
+        if (message == null)
+        {
+            // If no previous message found, set RequestedSemester to the current semester name
+            RequestedSemester = CurrentSemester;
+        }
+        else
+        {
+            // Else set it to the semester currently selected from the select-semester menu
+            var actionRows = message.Components.OfType<ActionRowComponent>();
+            var selectMenus = actionRows.SelectMany(row => row.Components.OfType<SelectMenuComponent>()).ToList();
+            RequestedSemester = selectMenus[0].Options.First(option => option.IsDefault == true).Value;
         }
     }
 }
