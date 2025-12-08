@@ -1,4 +1,5 @@
-﻿using Grade_Monitor.Models;
+﻿using Grade_Monitor.Core;
+using Grade_Monitor.Models;
 using Newtonsoft.Json;
 using System.IO;
 
@@ -11,25 +12,23 @@ internal static class ConfigurationManager
         Formatting = Formatting.Indented
     };
 
-    private static readonly string ConfigFileName = "config.json";
-
     internal static AppConfiguration Load()
     {
         AppConfiguration? config;
 
-        if (!File.Exists(ConfigFileName))
+        if (!File.Exists(AppPaths.Config))
         {
             config = ConfigurationBootstrap.AskUserForConfiguration();
             Save(config);
             return config;
         }
 
-        var json = File.ReadAllText(ConfigFileName);
+        var json = File.ReadAllText(AppPaths.Config);
 
         config = JsonConvert.DeserializeObject<AppConfiguration>(json, JsonSettings);
 
         return config ?? throw new JsonException("Deserialized configuration is null.");
     }
 
-    internal static void Save(AppConfiguration appConfiguration) => File.WriteAllText(ConfigFileName, JsonConvert.SerializeObject(appConfiguration, JsonSettings));
+    internal static void Save(AppConfiguration appConfiguration) => File.WriteAllText(AppPaths.Config, JsonConvert.SerializeObject(appConfiguration, JsonSettings));
 }
