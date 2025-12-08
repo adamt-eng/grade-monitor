@@ -3,7 +3,6 @@ using Grade_Monitor.Configuration;
 using Grade_Monitor.Core;
 using Grade_Monitor.Helpers;
 using Grade_Monitor.Models;
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -17,90 +16,88 @@ internal class CommandHandler : IDiscordEventHandler
         return Task.CompletedTask;
     }
 
-    private static Task HandleCommandAsync(SocketSlashCommand socketSlashCommand)
+    private static async Task HandleCommandAsync(SocketSlashCommand command)
     {
-        _ = Task.Run(async () =>
+        // Acknowledge interaction
+        await command.DeferAsync(ephemeral: true);
+
+        var options = command.Data.Options;
+        if (options == null || options.Count < 2)
         {
-            try
+            await command.FollowupAsync("Invalid command parameters.", ephemeral: true);
+            return;
+        }
+
+        var param1 = options.ElementAt(0).Value.ToString();
+        var param2 = options.ElementAt(1).Value.ToString();
+
+        RefreshTimerHelper.RefreshTimer.Stop();
+
+        switch (command.CommandName)
+        {
+            case "update-interval":
             {
-                // Acknowledge this interaction
-                await socketSlashCommand.DeferAsync(ephemeral: true).ConfigureAwait(false);
-
-                var commandParameters = socketSlashCommand.Data.Options.ToList();
-                var param1 = commandParameters[0].Value;
-                var param2 = commandParameters[1].Value;
-
-                RefreshTimerHelper.RefreshTimer.Stop();
-
-                switch (socketSlashCommand.CommandName)
+                if (!int.TryParse(param1, out var interval) ||
+                    !int.TryParse(param2, out var retryInterval))
                 {
-                    case "update-interval":
-                    {
-                        DiscordApp.AppConfig.TimerIntervalInMinutes = Convert.ToInt32(param1);
-                        DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes = Convert.ToInt32(param2);
-
-                        // Update config.json
-                        ConfigurationManager.Save(DiscordApp.AppConfig);
-
-                        await socketSlashCommand.FollowupAsync("Intervals updated successfully.", ephemeral: true).ConfigureAwait(false);
-                        break;
-                    }
-                    case "get-grades":
-                    {
-                        var studentId = param1.ToString();
-                        var password = param2.ToString();
-
-                        if (string.IsNullOrWhiteSpace(studentId) ||
-                            string.IsNullOrWhiteSpace(password))
-                        {
-                            return;
-                        }
-
-                        var discordUserId = socketSlashCommand.User.Id;
-
-                        SessionManager.TryGetSession(discordUserId, out var session);
-
-                        User user;
-
-                        // Session being null indicates that the user was not registered to the app
-                        // and thus their data is not saved in config.json
-                        if (session == null)
-                        {
-                            user = new User
-                            {
-                                DiscordUserId = discordUserId,
-                                StudentId = studentId,
-                                Password = password
-                            };
-
-                            DiscordApp.AppConfig.Users.Add(user);
-                        }
-                        else
-                        {
-                            user = session.User;
-                            user.StudentId = studentId;
-                            user.Password = password;
-                        }
-
-                        // Update config.json
-                        ConfigurationManager.Save(DiscordApp.AppConfig);
-
-                        await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
-
-                        await GradesHelper.GetGrades(discordUserId: discordUserId, interactionType: "SlashCommandExecuted").ConfigureAwait(false);
-                        break;
-                    }
+                    await command.FollowupAsync("Invalid interval values.", ephemeral: true);
+                    break;
                 }
 
-                SessionManager.ClearSessions();
+                DiscordApp.AppConfig.TimerIntervalInMinutes = interval;
+                DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes = retryInterval;
 
-                RefreshTimerHelper.RefreshTimer.Start();
+                ConfigurationManager.Save(DiscordApp.AppConfig);
+
+                await command.FollowupAsync("Intervals updated successfully.", ephemeral: true);
+                break;
             }
-            catch (Exception ex)
+            case "get-grades":
             {
-                LoggingService.WriteLog($"SlashCommandExecuted Exception: {ex}", ConsoleColor.Red);
+                if (string.IsNullOrWhiteSpace(param1) ||
+                    string.IsNullOrWhiteSpace(param2))
+                {
+                    await command.FollowupAsync("Student ID or password is missing.", ephemeral: true);
+                    break;
+                }
+
+                var discordUserId = command.User.Id;
+
+                User user;
+
+                // Session being null indicates that the user was not registered to the app
+                // and thus their data is not saved in config.json
+                if (!SessionManager.TryGetSession(discordUserId, out var session))
+                {
+                    user = new User
+                    {
+                        DiscordUserId = discordUserId,
+                        StudentId = param1,
+                        Password = param2
+                    };
+
+                    DiscordApp.AppConfig.Users.Add(user);
+                }
+                else
+                {
+                    user = session.User;
+                    user.StudentId = param1;
+                    user.Password = param2;
+                }
+
+                ConfigurationManager.Save(DiscordApp.AppConfig);
+
+                await command.FollowupAsync(
+                    "You will receive a private message with your grades within a few seconds.",
+                    ephemeral: true);
+
+                await GradesHelper.GetGrades(discordUserId, "SlashCommandExecuted");
+                break;
             }
-        });
-        return Task.CompletedTask;
+        }
+
+        SessionManager.ClearSessions();
+
+        RefreshTimerHelper.RefreshTimer.Start();
     }
 }
