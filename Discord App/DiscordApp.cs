@@ -30,11 +30,7 @@ internal class DiscordApp
     {
         Client.Log += message =>
         {
-            _ = Task.Run(() =>
-            {
-                LoggingService.WriteLog(message.Message, ConsoleColor.Gray);
-                return Task.CompletedTask;
-            });
+            LoggingService.WriteLog(message.Message, ConsoleColor.Gray);
             return Task.CompletedTask;
         };
 
