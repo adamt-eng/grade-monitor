@@ -4,7 +4,7 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 
 ## :toolbox: Used Technologies
 
-- **.NET 9 (C#):** Core framework for building and running the application logic.
+- **.NET 10 (C#):** Core framework for building and running the application logic.
 - **Selenium WebDriver:** Used to automate browser interactions for login and reCAPTCHA solving.
 - **SolveCaptcha API:** Automatically solves reCAPTCHA v2 challenges.
 - **Json.NET (Newtonsoft.Json):** Handles JSON config files and API responses.
@@ -126,7 +126,7 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ### :three: Prerequisites
 
-Make sure you have [.NET 9.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/9.0) installed.
+Make sure you have [.NET 10.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) installed.
 
 To verify installation:
 
