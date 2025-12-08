@@ -52,8 +52,8 @@ internal class DiscordApp
             return Task.CompletedTask;
         };
 
-        await Client.LoginAsync(TokenType.Bot, AppConfig.BotToken).ConfigureAwait(false);
-        await Client.StartAsync().ConfigureAwait(false);
-        await Task.Delay(-1).ConfigureAwait(false);
+        await Client.LoginAsync(TokenType.Bot, AppConfig.BotToken);
+        await Client.StartAsync();
+        await Task.Delay(-1);
     }
 }

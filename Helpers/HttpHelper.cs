@@ -19,8 +19,8 @@ internal class HttpHelper
         try
         {
             LoggingService.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
-            using var response = await _httpClient.GetAsync(url).ConfigureAwait(false);
-            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var response = await _httpClient.GetAsync(url);
+            return await response.Content.ReadAsStringAsync();
         }
         catch (Exception)
         {

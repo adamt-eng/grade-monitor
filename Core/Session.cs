@@ -52,7 +52,7 @@ internal partial class Session
             _httpHelper.SetCookie("https://eng.asu.edu.eg", $"asueng_web={User.LaravelSession}");
         }
 
-        var html = await _httpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", User.DiscordUserId).ConfigureAwait(false);
+        var html = await _httpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", User.DiscordUserId);
         if (html.Contains("my_courses"))
         {
             LoggingService.WriteLog($"{User.DiscordUserId}: Stored session found, reusing cookies.", ConsoleColor.Magenta);
@@ -131,7 +131,7 @@ internal partial class Session
 
     internal async Task LoadStudentData()
     {
-        await LoadStudentCourses().ConfigureAwait(false);
+        await LoadStudentCourses();
 
         ExtractAndStoreUserSemesters();
     }
@@ -140,7 +140,7 @@ internal partial class Session
     {
         if (FetchFinalGrades && !_fetchedFinalGrades)
         {
-            return await FetchFinalGradesAsync().ConfigureAwait(false);
+            return await FetchFinalGradesAsync();
         }
 
         // Set _fetchedFinalGrades to false to allow an attempt
@@ -186,12 +186,12 @@ internal partial class Session
         // If no courses stored in configuration or if refreshRequired is true
         if (courses.Count == 0 || refreshRequired)
         {
-            await RefreshCoursesUrls(courses).ConfigureAwait(false);
+            await RefreshCoursesUrls(courses);
         }
 
         var grades = new SortedDictionary<string, string>();
 
-        await Task.WhenAll(courses.Select(Selector)).ConfigureAwait(false);
+        await Task.WhenAll(courses.Select(Selector));
 
         return grades;
 
@@ -207,7 +207,7 @@ internal partial class Session
             // If this occurs, it will refetch all course urls
             if (filteredHtmlLines.Count == 0)
             {
-                await RefreshCoursesUrls(courses).ConfigureAwait(false);
+                await RefreshCoursesUrls(courses);
                 htmlLines = (await _httpHelper.FetchPage(courses[course.Key], User.DiscordUserId).ConfigureAwait(false)).Split('\n');
                 filteredHtmlLines = [.. htmlLines.Where(ContainsGradeIdentifier)];
             }
@@ -264,7 +264,7 @@ internal partial class Session
         if (grades.Count == 0)
         {
             _fetchedFinalGrades = true;
-            return await FetchGradesReport().ConfigureAwait(false);
+            return await FetchGradesReport();
         }
 
         return grades;
@@ -357,7 +357,7 @@ internal partial class Session
         // The student_courses page contains the list of all semesters including the name of the current semester
         // It also contains all previous courses and their final grades
         // It's crucial for the grade fetching process
-        _studentCourses = await _httpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", User.DiscordUserId).ConfigureAwait(false);
+        _studentCourses = await _httpHelper.FetchPage("https://eng.asu.edu.eg/study/studies/student_courses", User.DiscordUserId);
 
         // Filling questionnaire is required.
         if (_studentCourses.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))

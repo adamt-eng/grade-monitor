@@ -24,8 +24,8 @@ internal static class GradesHelper
             stopwatch.Start();
 
             // Get the DM channel between the user and the bot
-            var user = await DiscordApp.Client.GetUserAsync(discordUserId).ConfigureAwait(false);
-            var dmChannel = await user.CreateDMChannelAsync().ConfigureAwait(false);
+            var user = await DiscordApp.Client.GetUserAsync(discordUserId);
+            var dmChannel = await user.CreateDMChannelAsync();
 
             // Get all messages in the DM channel
             var messages = (await dmChannel.GetMessagesAsync().FlattenAsync().ConfigureAwait(false)).ToList();
@@ -69,7 +69,7 @@ internal static class GradesHelper
                 // Delete all messages sent by the bot in the DM channel
                 foreach (var item in messages)
                 {
-                    await item.DeleteAsync().ConfigureAwait(false);
+                    await item.DeleteAsync();
                 }
             }
 
@@ -86,11 +86,11 @@ internal static class GradesHelper
                 // Attempt login
                 if (await session.Login().ConfigureAwait(false))
                 {
-                    await session.LoadStudentData().ConfigureAwait(false);
+                    await session.LoadStudentData();
 
                     session.DetermineRequestedSemester(message);
 
-                    var gradesReport = await session.FetchGradesReport().ConfigureAwait(false);
+                    var gradesReport = await session.FetchGradesReport();
 
                     stopwatch.Stop();
                     LoggingService.WriteLog($"{discordUserId}: Elapsed time: {stopwatch.ElapsedMilliseconds}ms", ConsoleColor.Yellow);
@@ -124,7 +124,7 @@ internal static class GradesHelper
                     if (message != null && (interactionType.Contains("SelectMenuExecuted") || interactionType == "OnTimerElapsed" && EmbedsIdentical(embedBuilder, previousEmbedBuilder)))
                     {
                         // Silently update the timestamp in the already sent message to indicate that the app is functioning as expected
-                        await message.ModifyAsync(Update).ConfigureAwait(false);
+                        await message.ModifyAsync(Update);
 
                         void Update(MessageProperties properties)
                         {
@@ -141,10 +141,10 @@ internal static class GradesHelper
                     {
                         if (message != null)
                         {
-                            await message.DeleteAsync().ConfigureAwait(false);
+                            await message.DeleteAsync();
                         }
 
-                        await user.SendMessageAsync(text: NextRefresh(session.Timer), embed: embedBuilder.Build(), components: components).ConfigureAwait(false);
+                        await user.SendMessageAsync(text: NextRefresh(session.Timer), embed: embedBuilder.Build(), components: components);
                     }
 
                     // Reset fails counter
@@ -169,15 +169,15 @@ internal static class GradesHelper
 
                 if (message == null)
                 {
-                    await user.SendMessageAsync(text: text, components: DiscordHelper.CreateMessageComponent()).ConfigureAwait(false);
+                    await user.SendMessageAsync(text: text, components: DiscordHelper.CreateMessageComponent());
                 }
                 else
                 {
-                    await message.ModifyAsync(x => x.Content = text).ConfigureAwait(false);
+                    await message.ModifyAsync(x => x.Content = text);
 
                     if (session.Fails == 1)
                     {
-                        await user.SendMessageAsync(text: $"<@{user.Id}>").ConfigureAwait(false);
+                        await user.SendMessageAsync(text: $"<@{user.Id}>");
                     }
                 }
             }
