@@ -22,10 +22,10 @@ internal static class RefreshTimerHelper
         // Each user has a timestamp at which their grades will be fetched
         // And the fetch requests are made as far away as possible from each other to minimize any interference
 
-        var interval = DiscordApp.Config.TimerIntervalInMinutes * 60;
+        var interval = DiscordApp.AppConfig.TimerIntervalInMinutes * 60;
 
         // Get user count
-        var userCount = DiscordApp.Config.Users.Count;
+        var userCount = DiscordApp.AppConfig.Users.Count;
 
         // No users, no point in proceeding
         if (userCount == 0)
@@ -41,7 +41,7 @@ internal static class RefreshTimerHelper
         // Track user index
         var index = 0;
 
-        foreach (var user in DiscordApp.Config.Users)
+        foreach (var user in DiscordApp.AppConfig.Users)
         {
             var discordUserId = user.DiscordUserId;
 

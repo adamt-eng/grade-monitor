@@ -1,12 +1,13 @@
-﻿using System;
+﻿using Discord;
+using Grade_Monitor.Configuration;
+using Grade_Monitor.Discord_App;
+using Grade_Monitor.Helpers;
+using Grade_Monitor.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Discord;
-using Grade_Monitor.Configuration;
-using Grade_Monitor.Discord_App;
-using Grade_Monitor.Helpers;
 
 namespace Grade_Monitor.Core;
 
@@ -116,8 +117,8 @@ internal partial class Session
 
             // The faculty uses asueng_web as an alternative name to the laravel_session cookie
             var laravelSession = cookies.First(cookie => cookie.Name is "asueng_web" or "laravel_session").Value;
-            DiscordApp.Config.Users.First(user => user.DiscordUserId == User.DiscordUserId).LaravelSession = laravelSession;
-            DiscordApp.ConfigManager.Save(DiscordApp.Config);
+            DiscordApp.AppConfig.Users.First(user => user.DiscordUserId == User.DiscordUserId).LaravelSession = laravelSession;
+            ConfigurationManager.Save(DiscordApp.AppConfig);
         }
 
         // Extract cumulative GPA
@@ -166,7 +167,7 @@ internal partial class Session
                 // force a refresh of all course data for the requested semester
                 foreach (var course in semester.Value)
                 {
-                    if (!DiscordApp.Config.Courses.TryGetValue(course, out var courseUrl))
+                    if (!DiscordApp.AppConfig.Courses.TryGetValue(course, out var courseUrl))
                     {
                         refreshRequired = true;
                         break;
@@ -310,11 +311,11 @@ internal partial class Session
             User.Semesters[courseSemester].Add(courseName);
 
             // Add the course and it's URL to the global Courses dictionary
-            DiscordApp.Config.Courses[courseName] = courseUrl;
+            DiscordApp.AppConfig.Courses[courseName] = courseUrl;
         }
 
         // Update config.json
-        DiscordApp.ConfigManager.Save(DiscordApp.Config);
+        ConfigurationManager.Save(DiscordApp.AppConfig);
     }
 
     private IEnumerable<Course> ParseStudentCourses()

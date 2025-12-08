@@ -160,7 +160,7 @@ internal static class GradesHelper
                 if (exception.Message == "Faculty server is currently down." || exception.Message.Contains("FetchPage"))
                 {
                     // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
-                    session.Timer = DiscordApp.Config.TimerIntervalAfterExceptionsInMinutes * 60;
+                    session.Timer = DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes * 60;
                 }
 
                 ++session.Fails;
