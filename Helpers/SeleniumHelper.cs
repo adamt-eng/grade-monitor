@@ -1,18 +1,21 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.IO;
-using System.Threading.Tasks;
+﻿using Grade_Monitor.Core;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
+using System;
+using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 
 namespace Grade_Monitor.Helpers;
 
 internal static class SeleniumHelper
 {
-    private static ChromeDriver _driver;
+    private static ChromeDriver? _driver;
+    private static WebDriverWait? _wait;
 
-    internal static ReadOnlyCollection<Cookie> GetCookies() => _driver.Manage().Cookies.AllCookies;
+    private static readonly TimeSpan DefaultWait = TimeSpan.FromSeconds(10);
+
+    internal static ReadOnlyCollection<Cookie> GetCookies() => _driver == null ? throw new InvalidOperationException("Driver not initialized.") : _driver.Manage().Cookies.AllCookies;
 
     private static void InitializeDriver()
     {
@@ -31,42 +34,67 @@ internal static class SeleniumHelper
         options.AddArgument("--log-level=3");
         options.AddArgument("--disable-logging");
 
-        var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        var chromePath = Path.Combine(baseDir, "chrome-win64", "chrome.exe");
-        var chromedriverDir = Path.Combine(baseDir, "chromedriver-win64");
+        options.BinaryLocation = AppPaths.ChromeExe;
 
-        options.BinaryLocation = chromePath;
-
-        var service = ChromeDriverService.CreateDefaultService(chromedriverDir);
+        var service = ChromeDriverService.CreateDefaultService(AppPaths.ChromeDriver);
         service.HideCommandPromptWindow = true;
 
         _driver = new ChromeDriver(service, options);
+        _wait = new WebDriverWait(_driver, DefaultWait);
     }
 
-    internal static void FillTextField(string elementName, string text) => _driver.FindElement(By.Name(elementName)).SendKeys(text);
+    private static IWebElement Find(By by)
+    {
+        if (_wait == null || _driver == null)
+            throw new InvalidOperationException("Driver not initialized.");
+
+        return _wait.Until(_ => _driver.FindElement(by));
+    }
+
+    private static object? Exec(string script, params object?[] args) => _driver == null ? throw new InvalidOperationException("Driver not initialized.") : ((IJavaScriptExecutor)_driver).ExecuteScript(script, args);
+
+    private static void WaitDocumentLoaded()
+    {
+        if (_wait == null)
+            throw new InvalidOperationException("Driver not initialized.");
+
+        _wait.Until(_ =>
+            Exec("return document.readyState")?.ToString() == "complete"
+        );
+    }
+
+    internal static void FillTextField(string elementName, string text) => Find(By.Name(elementName)).SendKeys(text);
 
     internal static string SubmitLoginForm()
     {
-        var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
+        var loginButton = Find(By.XPath("//button[@type='submit']"));
 
-        var loginButton = wait.Until(driver => driver.FindElement(By.XPath("//button[@type='submit']")));
+        Exec("arguments[0].scrollIntoView(true); arguments[0].click();", loginButton);
 
-        ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView(true); arguments[0].click();", loginButton);
+        WaitDocumentLoaded();
 
-        wait.Until(webDriver => ((IJavaScriptExecutor)webDriver).ExecuteScript("return document.readyState")!.ToString() == "complete");
-
-        return _driver.PageSource;
+        return _driver == null ? throw new InvalidOperationException("Driver not initialized.") : _driver.PageSource;
     }
 
     internal static void SendRecaptchaToken(string token)
     {
-        ((IJavaScriptExecutor)_driver).ExecuteScript($"document.getElementById('g-recaptcha-response').style.display = 'block';document.getElementById('g-recaptcha-response').innerHTML = '{token}';");
+        Exec(@"
+            const el = document.getElementById('g-recaptcha-response');
+            el.style.display = 'block';
+            el.value = arguments[0];
+        ", token);
 
-        var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
-        wait.Until(webDriver => !string.IsNullOrWhiteSpace(((IJavaScriptExecutor)webDriver).ExecuteScript("return document.getElementById('g-recaptcha-response').value")!.ToString()));
+        if (_wait == null)
+            throw new InvalidOperationException("Driver not initialized.");
+
+        _wait.Until(_ =>
+        {
+            var val = Exec("return document.getElementById('g-recaptcha-response').value")?.ToString();
+            return !string.IsNullOrWhiteSpace(val);
+        });
     }
 
-    internal static Task<string> FetchPage(string url, ulong discordUserId)
+    internal static async Task<string> FetchPage(string url, ulong discordUserId)
     {
         try
         {
@@ -74,17 +102,34 @@ internal static class SeleniumHelper
 
             LoggingService.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
 
-            _driver!.Navigate().GoToUrl(url);
+            if (_driver == null)
+                throw new InvalidOperationException("Driver not initialized.");
 
-            var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(10));
-            wait.Until(webDriver => ((IJavaScriptExecutor)webDriver).ExecuteScript("return document.readyState")!.ToString() == "complete");
+            await _driver.Navigate().GoToUrlAsync(url);
 
-            return Task.FromResult(_driver.PageSource);
+            WaitDocumentLoaded();
+
+            return await Task.FromResult(_driver.PageSource);
         }
-        catch (Exception)
+        catch
         {
             LoggingService.WriteLog($"{discordUserId}: Exception (FetchPage - SeleniumHelper)", ConsoleColor.Red);
             throw;
+        }
+    }
+
+    internal static void Shutdown()
+    {
+        try
+        {
+            _driver?.Quit();
+            _driver?.Dispose();
+        }
+        catch { }
+        finally
+        {
+            _driver = null;
+            _wait = null;
         }
     }
 }
