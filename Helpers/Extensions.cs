@@ -4,29 +4,27 @@ namespace Grade_Monitor.Helpers;
 
 internal static class Extensions
 {
-    internal static string ExtractBetween(this string? source, string start, string end, bool lastIndexOf = true)
+    internal static string ExtractBetween(this string source, string start, string end, bool lastIndexOf = true)
     {
-        int startIndex, endIndex;
+        int startIndex;
+        int endIndex;
 
         if (lastIndexOf)
         {
+            // Locate final end marker
+            endIndex = source.LastIndexOf(end, StringComparison.Ordinal);
 
-            if (start == end)
-            {
-                endIndex = source.LastIndexOf(start, StringComparison.Ordinal);
-                startIndex = source.LastIndexOf(start, endIndex - 1, StringComparison.Ordinal);
-            }
-            else
-            {
-                endIndex = source.LastIndexOf(end, StringComparison.Ordinal);
-                startIndex = source.LastIndexOf(start, endIndex, StringComparison.Ordinal);
-            }
-
-            return source.Substring(startIndex + start.Length, endIndex - startIndex - start.Length);
+            // Locate start marker immediately before section ends
+            startIndex = start == end ? source.LastIndexOf(start, endIndex - 1, StringComparison.Ordinal) : source.LastIndexOf(start, endIndex, StringComparison.Ordinal);
+            startIndex += start.Length;
+        }
+        else
+        {
+            // First occurrence mode
+            startIndex = source.IndexOf(start, StringComparison.Ordinal) + start.Length;
+            endIndex = source.IndexOf(end, startIndex, StringComparison.Ordinal);
         }
 
-        startIndex = source.IndexOf(start, StringComparison.Ordinal) + start.Length;
-        endIndex = source.IndexOf(end, startIndex, StringComparison.Ordinal);
         return source[startIndex..endIndex];
     }
 }
