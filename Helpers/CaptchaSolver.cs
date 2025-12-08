@@ -1,15 +1,15 @@
-﻿using SolveCaptcha.Captcha;
-using System;
+﻿using System;
 using System.Threading.Tasks;
-using Grade_Monitor.Core;
+using Grade_Monitor.Discord_App;
+using SolveCaptcha.Captcha;
 
-namespace Grade_Monitor.Utilities;
+namespace Grade_Monitor.Helpers;
 
 internal static class CaptchaSolver
 {
     internal static void SolveRecaptcha(string pageName)
     {
-        var solver = new SolveCaptcha.SolveCaptcha(Program.Configuration.CaptchaSolverApiKey) { RecaptchaTimeout = 600, PollingInterval = 10 };
+        var solver = new SolveCaptcha.SolveCaptcha(DiscordApp.Config.CaptchaSolverApiKey) { RecaptchaTimeout = 600, PollingInterval = 10 };
         var asuRecaptchaKey = "6Lf17rUUAAAAAKR0rgH6aM7g0xjtzmxBK6w2T5j1";
 
         var captcha = new ReCaptcha();

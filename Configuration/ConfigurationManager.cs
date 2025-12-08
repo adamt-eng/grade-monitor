@@ -1,6 +1,6 @@
 ﻿using System;
 using System.IO;
-using Grade_Monitor.Core;
+using Grade_Monitor.Helpers;
 using Newtonsoft.Json;
 
 namespace Grade_Monitor.Configuration;
@@ -12,10 +12,10 @@ public class ConfigurationManager(string configFilePath)
     {
         if (!File.Exists(configFilePath))
         {
-            Program.WriteLog("Please enter your Discord bot's authorization token: ", ConsoleColor.Yellow);
+            LoggingService.WriteLog("Please enter your Discord bot's authorization token: ", ConsoleColor.Yellow);
             var botToken = Console.ReadLine();
 
-            Program.WriteLog("Please enter your solvecaptcha.com API key: ", ConsoleColor.Yellow);
+            LoggingService.WriteLog("Please enter your solvecaptcha.com API key: ", ConsoleColor.Yellow);
             var captchaSolverApiKey = Console.ReadLine();
 
             Save(new Configuration { BotToken = botToken, CaptchaSolverApiKey = captchaSolverApiKey });

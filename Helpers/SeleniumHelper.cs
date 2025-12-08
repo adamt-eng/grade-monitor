@@ -1,13 +1,12 @@
-﻿using Grade_Monitor.Core;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
-using OpenQA.Selenium.Support.UI;
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading.Tasks;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Support.UI;
 
-namespace Grade_Monitor.Utilities;
+namespace Grade_Monitor.Helpers;
 
 internal static class SeleniumHelper
 {
@@ -17,7 +16,8 @@ internal static class SeleniumHelper
 
     private static void InitializeDriver()
     {
-        if (_driver != null) return;
+        if (_driver != null)
+            return;
 
         var options = new ChromeOptions();
         options.AddArgument("--headless=new");
@@ -72,7 +72,7 @@ internal static class SeleniumHelper
         {
             InitializeDriver();
 
-            Program.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
+            LoggingService.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
 
             _driver!.Navigate().GoToUrl(url);
 
@@ -83,7 +83,7 @@ internal static class SeleniumHelper
         }
         catch (Exception)
         {
-            Program.WriteLog($"{discordUserId}: Exception (FetchPage - SeleniumHelper)", ConsoleColor.Red);
+            LoggingService.WriteLog($"{discordUserId}: Exception (FetchPage - SeleniumHelper)", ConsoleColor.Red);
             throw;
         }
     }

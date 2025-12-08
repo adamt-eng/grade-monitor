@@ -1,11 +1,12 @@
-﻿using Discord;
-using Grade_Monitor.Configuration;
-using Grade_Monitor.Utilities;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Discord;
+using Grade_Monitor.Configuration;
+using Grade_Monitor.Discord_App;
+using Grade_Monitor.Helpers;
 
 namespace Grade_Monitor.Core;
 
@@ -53,7 +54,7 @@ internal partial class Session
         var html = await _httpHelper.FetchPage("https://eng.asu.edu.eg/dashboard", User.DiscordUserId).ConfigureAwait(false);
         if (html.Contains("my_courses"))
         {
-            Program.WriteLog($"{User.DiscordUserId}: Stored session found, reusing cookies.", ConsoleColor.Magenta);
+            LoggingService.WriteLog($"{User.DiscordUserId}: Stored session found, reusing cookies.", ConsoleColor.Magenta);
         }
         else
         {
@@ -63,7 +64,7 @@ internal partial class Session
                 throw new Exception("Unable to fetch grades: A mandatory questionnaire must be completed first. Please visit the faculty website to fill it out and try again.");
             }
 
-            Program.WriteLog($"{User.DiscordUserId}: No stored session, initiating login.", ConsoleColor.Red);
+            LoggingService.WriteLog($"{User.DiscordUserId}: No stored session, initiating login.", ConsoleColor.Red);
 
             var pageName = "login";
             var emailField = "email";
@@ -86,7 +87,7 @@ internal partial class Session
             // If CAPTCHA is detected, solve it before submitting
             if (html.Contains("recaptcha"))
             {
-                Program.WriteLog($"{User.DiscordUserId}: CAPTCHA detected. Solving...", ConsoleColor.Yellow);
+                LoggingService.WriteLog($"{User.DiscordUserId}: CAPTCHA detected. Solving...", ConsoleColor.Yellow);
 
                 CaptchaSolver.SolveRecaptcha(pageName);
             }
@@ -115,14 +116,14 @@ internal partial class Session
 
             // The faculty uses asueng_web as an alternative name to the laravel_session cookie
             var laravelSession = cookies.First(cookie => cookie.Name is "asueng_web" or "laravel_session").Value;
-            Program.Configuration.Users.First(user => user.DiscordUserId == User.DiscordUserId).LaravelSession = laravelSession;
-            Program.ConfigurationManager.Save(Program.Configuration);
+            DiscordApp.Config.Users.First(user => user.DiscordUserId == User.DiscordUserId).LaravelSession = laravelSession;
+            DiscordApp.ConfigManager.Save(DiscordApp.Config);
         }
 
         // Extract cumulative GPA
         Cgpa = html.ExtractBetween("\"text-white\">", "<", lastIndexOf: false);
 
-        Program.WriteLog($"{User.DiscordUserId}: Logged in successfully.", ConsoleColor.Magenta);
+        LoggingService.WriteLog($"{User.DiscordUserId}: Logged in successfully.", ConsoleColor.Magenta);
 
         return true;
     }
@@ -165,7 +166,7 @@ internal partial class Session
                 // force a refresh of all course data for the requested semester
                 foreach (var course in semester.Value)
                 {
-                    if (!Program.Configuration.Courses.TryGetValue(course, out var courseUrl))
+                    if (!DiscordApp.Config.Courses.TryGetValue(course, out var courseUrl))
                     {
                         refreshRequired = true;
                         break;
@@ -307,13 +308,13 @@ internal partial class Session
         {
             // Add course name to the specified semester in the user's data
             User.Semesters[courseSemester].Add(courseName);
-            
+
             // Add the course and it's URL to the global Courses dictionary
-            Program.Configuration.Courses[courseName] = courseUrl;
+            DiscordApp.Config.Courses[courseName] = courseUrl;
         }
 
         // Update config.json
-        Program.ConfigurationManager.Save(Program.Configuration);
+        DiscordApp.ConfigManager.Save(DiscordApp.Config);
     }
 
     private IEnumerable<Course> ParseStudentCourses()

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Grade_Monitor.Utilities;
+namespace Grade_Monitor.Helpers;
 
 internal static class Extensions
 {

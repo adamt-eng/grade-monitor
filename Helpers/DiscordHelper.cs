@@ -1,10 +1,10 @@
-﻿using Discord;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Discord;
 using Discord.WebSocket;
 
-namespace Grade_Monitor.Utilities;
+namespace Grade_Monitor.Helpers;
 
 internal static class DiscordHelper
 {
@@ -91,7 +91,7 @@ internal static class DiscordHelper
                 Options = [.. semesters.OrderBy(semester =>
                 {
                     var semesterSplit = semester.Split(' ');
-                    
+
                     return int.Parse(semesterSplit[1]) * 3 + semesterSplit[0] switch
                     {
                         "Spring" => 0,
