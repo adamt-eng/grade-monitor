@@ -67,7 +67,7 @@ internal class CommandHandler : IDiscordEventHandler
 
                 // Session being null indicates that the user was not registered to the app
                 // and thus their data is not saved in config.json
-                if (!SessionManager.TryGetSession(discordUserId, out var session))
+                if (!SessionsManager.TryGetSession(discordUserId, out var session))
                 {
                     user = new User
                     {
@@ -96,7 +96,7 @@ internal class CommandHandler : IDiscordEventHandler
             }
         }
 
-        SessionManager.ClearSessions();
+        SessionsManager.ClearSessions();
 
         RefreshTimerHelper.RefreshTimer.Start();
     }

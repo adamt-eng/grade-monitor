@@ -11,20 +11,16 @@ using System.Threading.Tasks;
 
 namespace Grade_Monitor.Core;
 
-internal partial class Session
+internal class Session
 {
-    private record Course(string FullName, string Semester, string Url, string Grade);
-
-    [GeneratedRegex(@"\b(Fall|Spring|Summer) \d{4}\b")] private static partial Regex SemesterRegex(); // Regular expression to identify semester names
-
-    internal int Timer; // Timestamp at which this user's grades will be refreshed
+    internal int Offset; // Timestamp at which this user's grades will be refreshed
 
     internal User User; // The user associated with this session
 
-    internal string Cgpa; // User's CGPA, fetched from the dashboard
-    internal string RequestedSemester; // The semester the user has selected
+    internal string? Cgpa; // User's CGPA, fetched from the dashboard
+    internal string? RequestedSemester; // The semester the user has selected
 
-    private string _studentCourses; // The 'Student Courses' page source
+    private string? _studentCourses; // The 'Student Courses' page source
 
     internal int Fails; // Fail counter
 
@@ -35,8 +31,7 @@ internal partial class Session
 
     // Lazily gets the current semester name from _studentCourses.
     // The value is extracted only on first access and then cached in _currentSemester.
-    private string _currentSemester;
-    private string CurrentSemester => _currentSemester ??= _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
+    private string CurrentSemester => field ??= _studentCourses.ExtractBetween("<strong>Term</strong>: ", "<", lastIndexOf: false).Trim();
 
     internal Session(User user)
     {
@@ -90,7 +85,9 @@ internal partial class Session
             {
                 LoggingService.WriteLog($"{User.DiscordUserId}: CAPTCHA detected. Solving...", ConsoleColor.Yellow);
 
-                CaptchaSolver.SolveRecaptcha(pageName);
+                var token = await CaptchaSolver.SolveRecaptchaAsync(pageName);
+
+                SeleniumHelper.SendRecaptchaToken(token);
             }
 
             // Submit the login form
@@ -325,6 +322,9 @@ internal partial class Session
         // So while this approach is not future-proof, the faculty does not update
         // the site frequently so it's the best method at the moment
 
+        if (_studentCourses == null)
+            yield break;
+
         var lines = _studentCourses.Split(Environment.NewLine);
         var i = 0;
 
@@ -369,7 +369,10 @@ internal partial class Session
     private void ExtractAndStoreUserSemesters()
     {
         // Store the name of each semester
-        foreach (Match semester in SemesterRegex().Matches(_studentCourses))
+        if (_studentCourses == null)
+            return;
+
+        foreach (Match semester in RegexHelper.SemesterNamePattern().Matches(_studentCourses))
         {
             var semesterName = semester.Value;
 
@@ -381,7 +384,7 @@ internal partial class Session
         }
     }
 
-    internal void DetermineRequestedSemester(IUserMessage message)
+    internal void DetermineRequestedSemester(IUserMessage? message)
     {
         // RequestedSemester is always == null EXCEPT for the call where
         // the user manually selected a semester using the select-semester menu

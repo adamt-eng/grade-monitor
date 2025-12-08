@@ -43,7 +43,7 @@ internal static class RefreshTimerHelper
             var discordUserId = user.DiscordUserId;
 
             // If user is not stored in Sessions
-            if (!SessionManager.TryGetSession(discordUserId, out var session))
+            if (!SessionsManager.TryGetSession(discordUserId, out var session))
             {
                 var offset = intervalPerUser * index;
 
@@ -52,7 +52,7 @@ internal static class RefreshTimerHelper
                     Offset = offset
                 };
 
-                SessionManager.AddSession(discordUserId, session);
+                SessionsManager.AddSession(discordUserId, session);
 
                 LoggingService.WriteLog($"{discordUserId}: Created session, starting monitoring in {offset} seconds.", ConsoleColor.Cyan);
             }

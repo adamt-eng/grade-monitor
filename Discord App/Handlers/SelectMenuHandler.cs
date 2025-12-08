@@ -21,7 +21,7 @@ internal class SelectMenuHandler : IDiscordEventHandler
 
         var discordUserId = component.User.Id;
 
-        if (!SessionManager.TryGetSession(discordUserId, out var session))
+        if (!SessionsManager.TryGetSession(discordUserId, out var session))
         {
             await component.FollowupAsync("Session not found.", ephemeral: true);
             return;

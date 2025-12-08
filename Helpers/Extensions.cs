@@ -4,7 +4,7 @@ namespace Grade_Monitor.Helpers;
 
 internal static class Extensions
 {
-    internal static string ExtractBetween(this string source, string start, string end, bool lastIndexOf = true)
+    internal static string ExtractBetween(this string? source, string start, string end, bool lastIndexOf = true)
     {
         int startIndex, endIndex;
 

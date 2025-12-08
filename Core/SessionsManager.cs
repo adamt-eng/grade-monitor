@@ -2,7 +2,7 @@
 
 namespace Grade_Monitor.Core;
 
-internal static class SessionManager
+internal static class SessionsManager
 {
     private static readonly Dictionary<ulong, Session> Sessions = [];
 

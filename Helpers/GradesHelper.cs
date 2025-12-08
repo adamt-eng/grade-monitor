@@ -35,11 +35,11 @@ internal static class GradesHelper
 
             // The DM channel should contain only one message.
             // This message will be stored in:
-            IUserMessage message = null;
+            IUserMessage? message = null;
 
             // That message must contain exactly one embed with the grades.
             // The embed will be stored in:
-            EmbedBuilder previousEmbedBuilder = null;
+            EmbedBuilder? previousEmbedBuilder = null;
 
             // If these conditions aren’t met, message remains null and will be handled after this block.
             if (messages.Count == 1)
@@ -74,7 +74,7 @@ internal static class GradesHelper
             }
 
             // Get user session
-            var sessionFound = SessionManager.TryGetSession(discordUserId, out var session);
+            var sessionFound = SessionsManager.TryGetSession(discordUserId, out var session);
 
             if (!sessionFound)
             {
@@ -128,7 +128,7 @@ internal static class GradesHelper
 
                         void Update(MessageProperties properties)
                         {
-                            properties.Content = NextRefresh(session.Timer);
+                            properties.Content = NextRefresh(session.Offset);
                             properties.Embed = embedBuilder.Build();
                             properties.Components = components;
                         }
@@ -144,7 +144,7 @@ internal static class GradesHelper
                             await message.DeleteAsync();
                         }
 
-                        await user.SendMessageAsync(text: NextRefresh(session.Timer), embed: embedBuilder.Build(), components: components);
+                        await user.SendMessageAsync(text: NextRefresh(session.Offset), embed: embedBuilder.Build(), components: components);
                     }
 
                     // Reset fails counter
@@ -160,12 +160,12 @@ internal static class GradesHelper
                 if (exception.Message == "Faculty server is currently down." || exception.Message.Contains("FetchPage"))
                 {
                     // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
-                    session.Timer = DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes * 60;
+                    session.Offset = DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes * 60;
                 }
 
                 ++session.Fails;
 
-                var text = $"{NextRefresh(session.Timer)}\n\nAttempt #{session.Fails} 🔂\n\nError: {exception.Message}";
+                var text = $"{NextRefresh(session.Offset)}\n\nAttempt #{session.Fails} 🔂\n\nError: {exception.Message}";
 
                 if (message == null)
                 {

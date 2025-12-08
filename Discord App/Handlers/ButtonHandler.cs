@@ -30,7 +30,7 @@ internal class ButtonHandler : IDiscordEventHandler
             }
             case "refetch-courses":
             {
-                if (!SessionManager.TryGetSession(discordUserId, out var session))
+                if (!SessionsManager.TryGetSession(discordUserId, out var session))
                 {
                     await component.FollowupAsync(
                         "Unable to find your credentials, please use the command `/get-grades` again.",
