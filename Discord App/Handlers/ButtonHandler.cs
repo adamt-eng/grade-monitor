@@ -1,6 +1,5 @@
 ﻿using Discord.WebSocket;
 using Grade_Monitor.Core.Session;
-using Grade_Monitor.Helpers;
 using System.Threading.Tasks;
 
 namespace Grade_Monitor.Discord_App.Handlers;
