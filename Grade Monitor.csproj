@@ -17,7 +17,7 @@
     <IsPublishable>True</IsPublishable>
     <SignAssembly>False</SignAssembly>
     <Platforms>AnyCPU;x64</Platforms>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
     <PublishAot>False</PublishAot>
 	<ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
 	<Configurations>Debug;Release;Publish Release</Configurations>
