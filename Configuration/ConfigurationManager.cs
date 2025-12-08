@@ -1,30 +1,35 @@
-﻿using System;
-using System.IO;
-using Grade_Monitor.Helpers;
+﻿using Grade_Monitor.Models;
 using Newtonsoft.Json;
+using System.IO;
 
 namespace Grade_Monitor.Configuration;
 
-public class ConfigurationManager(string configFilePath)
+internal static class ConfigurationManager
 {
-    private readonly JsonSerializerSettings _jsonSettings = new() { Formatting = Formatting.Indented };
-    public Configuration Load()
+    private static readonly JsonSerializerSettings JsonSettings = new()
     {
-        if (!File.Exists(configFilePath))
+        Formatting = Formatting.Indented
+    };
+
+    private static readonly string ConfigFileName = "config.json";
+
+    internal static AppConfiguration Load()
+    {
+        AppConfiguration? config;
+
+        if (!File.Exists(ConfigFileName))
         {
-            LoggingService.WriteLog("Please enter your Discord bot's authorization token: ", ConsoleColor.Yellow);
-            var botToken = Console.ReadLine();
-
-            LoggingService.WriteLog("Please enter your solvecaptcha.com API key: ", ConsoleColor.Yellow);
-            var captchaSolverApiKey = Console.ReadLine();
-
-            Save(new Configuration { BotToken = botToken, CaptchaSolverApiKey = captchaSolverApiKey });
-
-            Console.Clear();
+            config = ConfigurationBootstrap.AskUserForConfiguration();
+            Save(config);
+            return config;
         }
 
-        return JsonConvert.DeserializeObject<Configuration>(File.ReadAllText(configFilePath), _jsonSettings);
+        var json = File.ReadAllText(ConfigFileName);
+
+        config = JsonConvert.DeserializeObject<AppConfiguration>(json, JsonSettings);
+
+        return config ?? throw new JsonException("Deserialized configuration is null.");
     }
 
-    public void Save(Configuration configuration) => File.WriteAllText(configFilePath, JsonConvert.SerializeObject(configuration, _jsonSettings));
+    internal static void Save(AppConfiguration appConfiguration) => File.WriteAllText(ConfigFileName, JsonConvert.SerializeObject(appConfiguration, JsonSettings));
 }

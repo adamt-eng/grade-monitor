@@ -3,6 +3,7 @@ using Discord.WebSocket;
 using Grade_Monitor.Configuration;
 using Grade_Monitor.Discord_App.Handlers;
 using Grade_Monitor.Helpers;
+using Grade_Monitor.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -23,15 +24,10 @@ internal class DiscordApp
         new SelectMenuHandler()
     ];
 
-    internal static ConfigurationManager ConfigManager;
-    internal static Configuration.Configuration Config;
+    internal static AppConfiguration AppConfig = ConfigurationManager.Load();
 
     internal async Task StartAsync()
     {
-        // Load configuration
-        ConfigManager = new ConfigurationManager("config.json");
-        Config = ConfigManager.Load();
-
         Client.Log += message =>
         {
             _ = Task.Run(() =>
@@ -56,7 +52,7 @@ internal class DiscordApp
             return Task.CompletedTask;
         };
 
-        await Client.LoginAsync(TokenType.Bot, Config.BotToken).ConfigureAwait(false);
+        await Client.LoginAsync(TokenType.Bot, AppConfig.BotToken).ConfigureAwait(false);
         await Client.StartAsync().ConfigureAwait(false);
         await Task.Delay(-1).ConfigureAwait(false);
     }
