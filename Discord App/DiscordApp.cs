@@ -39,13 +39,11 @@ internal class DiscordApp
             await handler.Initialize(Client);
         }
 
-        Client.Ready += () =>
+        Client.Ready += async () =>
         {
-            DiscordHelper.EnsureCommandsExist(Client);
+            await DiscordHelper.EnsureCommandsExistAsync(Client);
 
             RefreshTimerHelper.InitializeRefreshTimer();
-
-            return Task.CompletedTask;
         };
 
         await Client.LoginAsync(TokenType.Bot, AppConfig.BotToken);
