@@ -1,5 +1,5 @@
 ﻿using Discord.WebSocket;
-using Grade_Monitor.Core;
+using Grade_Monitor.Core.Session;
 using Grade_Monitor.Helpers;
 using System.Threading.Tasks;
 
@@ -25,7 +25,7 @@ internal class ButtonHandler : IDiscordEventHandler
         {
             case "refresh-grades":
             {
-                await GradesHelper.GetGrades(discordUserId, $"ButtonExecuted ({customId})");
+                await GradesInteractionService.GetGrades(discordUserId, $"ButtonExecuted ({customId})");
                 break;
             }
             case "refetch-courses":
@@ -42,7 +42,7 @@ internal class ButtonHandler : IDiscordEventHandler
                 // This is specifically added for cases where the user has withdrawn/dropped or added courses after using the application
                 session.User.Semesters.Clear();
 
-                await GradesHelper.GetGrades(discordUserId, $"ButtonExecuted ({customId})");
+                await GradesInteractionService.GetGrades(discordUserId, $"ButtonExecuted ({customId})");
                 break;
             }
         }

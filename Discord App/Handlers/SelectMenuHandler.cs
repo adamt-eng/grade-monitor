@@ -1,5 +1,5 @@
 ﻿using Discord.WebSocket;
-using Grade_Monitor.Core;
+using Grade_Monitor.Core.Session;
 using Grade_Monitor.Helpers;
 using System.Linq;
 using System.Threading.Tasks;
@@ -45,6 +45,6 @@ internal class SelectMenuHandler : IDiscordEventHandler
             }
         }
 
-        await GradesHelper.GetGrades(discordUserId, $"SelectMenuExecuted ({customId})");
+        await GradesInteractionService.GetGrades(discordUserId, $"SelectMenuExecuted ({customId})");
     }
 }

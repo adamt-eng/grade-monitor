@@ -1,4 +1,4 @@
-﻿using Grade_Monitor.Core;
+﻿using Grade_Monitor.Core.Session;
 using Grade_Monitor.Discord_App;
 using System;
 using System.Timers;
@@ -47,7 +47,7 @@ internal static class RefreshTimerHelper
             {
                 var offset = intervalPerUser * index;
 
-                session = new Session(user: user)
+                session = new SessionState(user: user)
                 {
                     Offset = offset
                 };
@@ -61,7 +61,7 @@ internal static class RefreshTimerHelper
             if (session.Offset == 0)
             {
                 session.Offset = intervalSeconds;
-                GradesHelper.GetGrades(discordUserId, "OnTimerElapsed").Wait();
+                GradesInteractionService.GetGrades(discordUserId, "OnTimerElapsed").Wait();
             }
 
             --session.Offset;

@@ -1,6 +1,6 @@
 ﻿using Discord.WebSocket;
 using Grade_Monitor.Configuration;
-using Grade_Monitor.Core;
+using Grade_Monitor.Core.Session;
 using Grade_Monitor.Helpers;
 using Grade_Monitor.Models;
 using System.Linq;
@@ -91,7 +91,7 @@ internal class CommandHandler : IDiscordEventHandler
                     "You will receive a private message with your grades within a few seconds.",
                     ephemeral: true);
 
-                await GradesHelper.GetGrades(discordUserId, "SlashCommandExecuted");
+                await GradesInteractionService.GetGrades(discordUserId, "SlashCommandExecuted");
                 break;
             }
         }
