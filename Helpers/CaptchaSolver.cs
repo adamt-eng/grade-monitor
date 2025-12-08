@@ -19,6 +19,8 @@ internal static class CaptchaSolver
 
     internal static async Task<string> SolveRecaptchaAsync(string pageName, int maxRetries = 5)
     {
+        LoggingService.WriteLog("Starting SolveCaptcha..", ConsoleColor.DarkGreen);
+
         var solver = new SolveCaptcha.SolveCaptcha(DiscordApp.AppConfig.CaptchaSolverApiKey)
         {
             RecaptchaTimeout = 600,
@@ -32,6 +34,8 @@ internal static class CaptchaSolver
 
         for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
+            LoggingService.WriteLog($"SolveCaptcha {attempt}/{maxRetries}..", ConsoleColor.DarkGreen);
+
             try
             {
                 await solver.Solve(captcha);
