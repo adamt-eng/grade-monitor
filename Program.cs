@@ -1,7 +1,7 @@
-﻿using System.Threading.Tasks;
-using Grade_Monitor.Discord_App;
+﻿using Grade_Monitor.Discord_App;
+using System.Threading.Tasks;
 
-namespace Grade_Monitor.Core;
+namespace Grade_Monitor;
 
 internal class Program
 {
