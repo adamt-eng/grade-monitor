@@ -16,29 +16,26 @@ internal static class RefreshTimerHelper
         RefreshTimer.Start();
     }
 
-    private static void OnTimerElapsed(object sender, ElapsedEventArgs e)
+    private static void OnTimerElapsed(object? sender, ElapsedEventArgs e)
     {
-        // This timer refreshes every one second, but grades are not surely fetched every 1 second
-        // Each user has a timestamp at which their grades will be fetched
-        // And the fetch requests are made as far away as possible from each other to minimize any interference
+        // This timer ticks every second and determines when each user should have their grades refreshed.
+        // Each user is assigned a refresh offset so that their requests are evenly distributed across the
+        // configured interval. This avoids simultaneous grade-fetching and reduces server load.
+        // The timer counts down per user; when a user’s counter reaches zero, a refresh is triggered
+        // and the counter is reset to the full interval.
 
-        var interval = DiscordApp.AppConfig.TimerIntervalInMinutes * 60;
+        var intervalSeconds = DiscordApp.AppConfig.TimerIntervalInMinutes * 60;
 
-        // Get user count
         var userCount = DiscordApp.AppConfig.Users.Count;
 
-        // No users, no point in proceeding
         if (userCount == 0)
-        {
             return;
-        }
 
-        // Divide the total interval specified in the configuration by the user count
-        // This will give us the time that is between each user's auto-refresh request
-        // This makes sure that the auto-refresh requests are as far away as possible from each other
-        var intervalPerUser = interval / userCount;
+        // Split the total refresh interval across all users.
+        // This determines how many seconds should separate each user’s scheduled refresh,
+        // ensuring their automatic grade checks are evenly spaced and do not occur at the same time.
+        var intervalPerUser = intervalSeconds / userCount;
 
-        // Track user index
         var index = 0;
 
         foreach (var user in DiscordApp.AppConfig.Users)
@@ -48,23 +45,26 @@ internal static class RefreshTimerHelper
             // If user is not stored in Sessions
             if (!SessionManager.TryGetSession(discordUserId, out var session))
             {
-                var timer = intervalPerUser * index;
+                var offset = intervalPerUser * index;
 
-                session = new Session(user: user) { Timer = timer };
+                session = new Session(user: user)
+                {
+                    Offset = offset
+                };
 
                 SessionManager.AddSession(discordUserId, session);
 
-                LoggingService.WriteLog($"{discordUserId}: Created session, starting monitoring in {timer} seconds.", ConsoleColor.Cyan);
+                LoggingService.WriteLog($"{discordUserId}: Created session, starting monitoring in {offset} seconds.", ConsoleColor.Cyan);
             }
 
             // It is time to fetch grades for this user
-            if (session.Timer == 0)
+            if (session.Offset == 0)
             {
-                session.Timer = interval;
+                session.Offset = intervalSeconds;
                 GradesHelper.GetGrades(discordUserId, "OnTimerElapsed").Wait();
             }
 
-            --session.Timer;
+            --session.Offset;
 
             ++index;
         }
