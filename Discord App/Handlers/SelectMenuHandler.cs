@@ -1,7 +1,6 @@
 ﻿using Discord.WebSocket;
 using Grade_Monitor.Core;
 using Grade_Monitor.Helpers;
-using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -15,52 +14,37 @@ internal class SelectMenuHandler : IDiscordEventHandler
         return Task.CompletedTask;
     }
 
-    private static Task HandleSelectMenuAsync(SocketMessageComponent socketMessageComponent)
+    private static async Task HandleSelectMenuAsync(SocketMessageComponent component)
     {
-        _ = Task.Run(async () =>
+        // Acknowledge interaction
+        await component.DeferAsync(ephemeral: true);
+
+        var discordUserId = component.User.Id;
+
+        if (!SessionManager.TryGetSession(discordUserId, out var session))
         {
-            try
+            await component.FollowupAsync("Session not found.", ephemeral: true);
+            return;
+        }
+
+        var data = component.Data;
+        var selection = data.Values.First();
+        var customId = data.CustomId;
+
+        switch (customId)
+        {
+            case "select-semester":
             {
-                // Acknowledge this interaction
-                await socketMessageComponent.DeferAsync(ephemeral: true).ConfigureAwait(false);
-
-                // Extract discordUserId
-                var discordUserId = socketMessageComponent.User.Id;
-
-                // Get user selection
-                var data = socketMessageComponent.Data;
-                var selection = data.Values.First();
-                var customId = data.CustomId;
-
-                var sessionFound = SessionManager.TryGetSession(discordUserId, out var session);
-
-                if (!sessionFound)
-                {
-                    return;
-                }
-
-                switch (customId)
-                {
-                    case "select-semester":
-                    {
-                        session.RequestedSemester = selection;
-                        break;
-                    }
-                    case "select-mode":
-                    {
-                        session.FetchFinalGrades = selection == "Mode 1: Final Grades";
-                        break;
-                    }
-                }
-
-                await GradesHelper.GetGrades(discordUserId: discordUserId, interactionType: $"SelectMenuExecuted ({customId})").ConfigureAwait(false);
-
+                session.RequestedSemester = selection;
+                break;
             }
-            catch (Exception ex)
+            case "select-mode":
             {
-                LoggingService.WriteLog($"SelectMenuExecuted Exception: {ex}", ConsoleColor.Red);
+                session.FetchFinalGrades = selection == "Mode 1: Final Grades";
+                break;
             }
-        });
-        return Task.CompletedTask;
+        }
+
+        await GradesHelper.GetGrades(discordUserId, $"SelectMenuExecuted ({customId})");
     }
 }
