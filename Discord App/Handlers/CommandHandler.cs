@@ -2,6 +2,7 @@
 using Grade_Monitor.Configuration;
 using Grade_Monitor.Core;
 using Grade_Monitor.Helpers;
+using Grade_Monitor.Models;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,37 +36,54 @@ internal class CommandHandler : IDiscordEventHandler
                 {
                     case "update-interval":
                     {
-                        DiscordApp.Config.TimerIntervalInMinutes = Convert.ToInt32(param1);
-                        DiscordApp.Config.TimerIntervalAfterExceptionsInMinutes = Convert.ToInt32(param2);
+                        DiscordApp.AppConfig.TimerIntervalInMinutes = Convert.ToInt32(param1);
+                        DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes = Convert.ToInt32(param2);
 
                         // Update config.json
-                        DiscordApp.ConfigManager.Save(DiscordApp.Config);
+                        ConfigurationManager.Save(DiscordApp.AppConfig);
 
                         await socketSlashCommand.FollowupAsync("Intervals updated successfully.", ephemeral: true).ConfigureAwait(false);
                         break;
                     }
                     case "get-grades":
                     {
+                        var studentId = param1.ToString();
+                        var password = param2.ToString();
+
+                        if (string.IsNullOrWhiteSpace(studentId) ||
+                            string.IsNullOrWhiteSpace(password))
+                        {
+                            return;
+                        }
+
                         var discordUserId = socketSlashCommand.User.Id;
 
                         SessionManager.TryGetSession(discordUserId, out var session);
 
+                        User user;
+
                         // Session being null indicates that the user was not registered to the app
                         // and thus their data is not saved in config.json
-                        var user = session == null ? new User { DiscordUserId = discordUserId } : session.User;
-
-                        // Save/update user information
-                        user.StudentId = param1.ToString();
-                        user.Password = param2.ToString();
-
-                        // Add user to configuration
                         if (session == null)
                         {
-                            DiscordApp.Config.Users.Add(user);
+                            user = new User
+                            {
+                                DiscordUserId = discordUserId,
+                                StudentId = studentId,
+                                Password = password
+                            };
+
+                            DiscordApp.AppConfig.Users.Add(user);
+                        }
+                        else
+                        {
+                            user = session.User;
+                            user.StudentId = studentId;
+                            user.Password = password;
                         }
 
                         // Update config.json
-                        DiscordApp.ConfigManager.Save(DiscordApp.Config);
+                        ConfigurationManager.Save(DiscordApp.AppConfig);
 
                         await socketSlashCommand.FollowupAsync("You will receive a private message with your grades within a few seconds.", ephemeral: true).ConfigureAwait(false);
 
