@@ -1,5 +1,4 @@
-﻿using Grade_Monitor.Core;
-using OpenQA.Selenium;
+﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using System;
@@ -10,18 +9,16 @@ namespace Grade_Monitor.Helpers;
 
 internal static class SeleniumHelper
 {
-    private static ChromeDriver? _driver;
-    private static WebDriverWait? _wait;
+    private static ChromeDriver? _driverBacking;
+    private static WebDriverWait? _waitBacking;
 
     private static readonly TimeSpan DefaultWait = TimeSpan.FromSeconds(10);
 
-    internal static ReadOnlyCollection<Cookie> GetCookies() => _driver == null ? throw new InvalidOperationException("Driver not initialized.") : _driver.Manage().Cookies.AllCookies;
+    private static ChromeDriver Driver => _driverBacking ??= CreateDriver();
+    private static WebDriverWait Wait => _waitBacking ??= new WebDriverWait(Driver, DefaultWait);
 
-    private static void InitializeDriver()
+    private static ChromeDriver CreateDriver()
     {
-        if (_driver != null)
-            return;
-
         var options = new ChromeOptions();
         options.AddArgument("--headless=new");
         options.AddArgument("--window-size=1920,1080");
@@ -34,36 +31,23 @@ internal static class SeleniumHelper
         options.AddArgument("--log-level=3");
         options.AddArgument("--disable-logging");
 
-        options.BinaryLocation = AppPaths.ChromeExe;
-
-        var service = ChromeDriverService.CreateDefaultService(AppPaths.ChromeDriver);
-        service.HideCommandPromptWindow = true;
-
-        _driver = new ChromeDriver(service, options);
-        _wait = new WebDriverWait(_driver, DefaultWait);
+        return new ChromeDriver(options);
     }
 
-    private static IWebElement Find(By by)
-    {
-        if (_wait == null || _driver == null)
-            throw new InvalidOperationException("Driver not initialized.");
+    internal static ReadOnlyCollection<Cookie> GetCookies() =>
+        Driver.Manage().Cookies.AllCookies;
 
-        return _wait.Until(_ => _driver.FindElement(by));
-    }
+    private static IWebElement Find(By by) =>
+        Wait.Until(_ => Driver.FindElement(by));
 
-    private static object? Exec(string script, params object?[] args) => _driver == null ? throw new InvalidOperationException("Driver not initialized.") : ((IJavaScriptExecutor)_driver).ExecuteScript(script, args);
+    private static object? Exec(string script, params object?[] args) =>
+        ((IJavaScriptExecutor)Driver).ExecuteScript(script, args);
 
-    private static void WaitDocumentLoaded()
-    {
-        if (_wait == null)
-            throw new InvalidOperationException("Driver not initialized.");
+    private static void WaitDocumentLoaded() =>
+        Wait.Until(_ => Exec("return document.readyState")?.ToString() == "complete");
 
-        _wait.Until(_ =>
-            Exec("return document.readyState")?.ToString() == "complete"
-        );
-    }
-
-    internal static void FillTextField(string elementName, string text) => Find(By.Name(elementName)).SendKeys(text);
+    internal static void FillTextField(string elementName, string text) =>
+        Find(By.Name(elementName)).SendKeys(text);
 
     internal static string SubmitLoginForm()
     {
@@ -73,7 +57,7 @@ internal static class SeleniumHelper
 
         WaitDocumentLoaded();
 
-        return _driver == null ? throw new InvalidOperationException("Driver not initialized.") : _driver.PageSource;
+        return Driver.PageSource;
     }
 
     internal static void SendRecaptchaToken(string token)
@@ -84,10 +68,7 @@ internal static class SeleniumHelper
             el.value = arguments[0];
         ", token);
 
-        if (_wait == null)
-            throw new InvalidOperationException("Driver not initialized.");
-
-        _wait.Until(_ =>
+        Wait.Until(_ =>
         {
             var val = Exec("return document.getElementById('g-recaptcha-response').value")?.ToString();
             return !string.IsNullOrWhiteSpace(val);
@@ -98,18 +79,12 @@ internal static class SeleniumHelper
     {
         try
         {
-            InitializeDriver();
-
             LoggingService.WriteLog($"{discordUserId}: {url}", ConsoleColor.DarkGreen);
 
-            if (_driver == null)
-                throw new InvalidOperationException("Driver not initialized.");
-
-            await _driver.Navigate().GoToUrlAsync(url);
-
+            await Driver.Navigate().GoToUrlAsync(url);
             WaitDocumentLoaded();
 
-            return await Task.FromResult(_driver.PageSource);
+            return Driver.PageSource;
         }
         catch
         {
@@ -122,14 +97,13 @@ internal static class SeleniumHelper
     {
         try
         {
-            _driver?.Quit();
-            _driver?.Dispose();
+            _driverBacking?.Quit();
+            _driverBacking?.Dispose();
         }
-        catch { }
         finally
         {
-            _driver = null;
-            _wait = null;
+            _driverBacking = null;
+            _waitBacking = null;
         }
     }
 }
