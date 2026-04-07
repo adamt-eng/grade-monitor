@@ -1,5 +1,4 @@
 using Grade_Monitor.Configuration;
-using Grade_Monitor.Core.Parsing;
 using Grade_Monitor.Core.Session;
 using Grade_Monitor.Discord_App;
 using Grade_Monitor.Helpers;
@@ -22,29 +21,17 @@ internal sealed class CourseUrlService
     {
         var result = new Dictionary<string, string>();
 
-        if (state.CurrentSemester == state.RequestedSemester)
-        {
-            var html = await _http.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", state.User.DiscordUserId);
-            var lines = html.Split('\n')
-                            .Where(l => state.CurrentSemester != null && l.Contains(state.CurrentSemester));
+        var html = await _http.FetchPage("https://eng.asu.edu.eg/dashboard/my_courses", state.User.DiscordUserId);
+        var lines = html.Split('\n')
+                        .Where(l => state.RequestedSemester != null && l.Contains(state.RequestedSemester));
 
-            foreach (var line in lines)
-            {
-                var name = line.ExtractBetween(">", " (");
-                var url = line.ExtractBetween("\"", "?");
-
-                AddToConfig(state, name, url);
-                result[name] = url;
-            }
-        }
-        else
+        foreach (var line in lines)
         {
-            foreach (var c in CourseParser.Parse(state.StudentCoursesHtml!)
-                                     .Where(c => c.Semester == state.RequestedSemester))
-            {
-                AddToConfig(state, c.FullName, c.Url);
-                result[c.FullName] = c.Url;
-            }
+            var name = line.ExtractBetween(">", " (");
+            var url = line.ExtractBetween("\"", "\"");
+
+            AddToConfig(state, name, url);
+            result[name] = url;
         }
 
         ConfigurationManager.Save(DiscordApp.AppConfig);
