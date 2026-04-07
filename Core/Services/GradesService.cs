@@ -79,7 +79,8 @@ internal sealed class GradesService
             }
         }
 
-        return string.Join(Environment.NewLine, details).Trim();
+        var result = string.Join(Environment.NewLine, details).Trim();
+        return result.Length > 0 ? result : "No grades available yet.";
     }
 
     private static bool ContainsGradeIdentifier(string s) =>
