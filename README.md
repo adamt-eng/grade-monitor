@@ -5,8 +5,9 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 ## :toolbox: Used Technologies
 
 - **.NET 10 (C#):** Core framework for building and running the application logic.
-- **Selenium WebDriver:** Used to automate browser interactions for login and reCAPTCHA solving.
-- **SolveCaptcha API:** Automatically solves reCAPTCHA v2 challenges.
+- **HttpClient (System.Net):** Performs the entire login and grade-fetching flow over plain HTTP requests.
+- **SixLabors.ImageSharp:** Cleans up the faculty's image CAPTCHA (isolates the digits from the noise) before recognition.
+- **ocr.space API:** Reads the digits out of the image CAPTCHA shown on the login page.
 - **Json.NET (Newtonsoft.Json):** Handles JSON config files and API responses.
 - **CookieContainer (System.Net):** Stores and manages session cookies across HTTP requests.
 - **Discord.Net:** A C# wrapper for the Discord API, enabling bot interaction, slash commands, and message handling.
@@ -78,11 +79,11 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ## :gear: Technical Features
 
-* **:key: Login via Selenium:**
-  Uses [Selenium](https://github.com/SeleniumHQ/selenium) only for the login process, allowing it to load and solve Google reCAPTCHA.
+* **:key: Login via HTTP:**
+  Logs in by talking to the faculty portal directly over HTTP — no browser automation required.
 
 * **:robot: CAPTCHA Solver Integration:**
-  Solves “I’m not a robot” reCAPTCHA challenges on the faculty site automatically using [SolveCaptcha](https://solvecaptcha.com).
+  Reads the faculty's image CAPTCHA automatically: the digits are isolated from the background noise with [ImageSharp](https://github.com/SixLabors/ImageSharp) and recognized via [ocr.space](https://ocr.space). Because new CAPTCHAs are free to fetch, the app keeps trying fresh ones until it gets a confident read before submitting. (The previous reCAPTCHA + [SolveCaptcha](https://solvecaptcha.com) solver is kept in the codebase in case the faculty switches back.)
 
 * **:cookie: Session Persistence:**
   Uses `CookieContainer` to store session cookies and reduce the need for repeated logins.
@@ -117,10 +118,10 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ---
 
-### :two: Get an API Key from SolveCaptcha
+### :two: Get an API Key from ocr.space
 
-- Go to [https://solvecaptcha.com](https://solvecaptcha.com) and register an account.
-- From the **Dashboard**, find and copy your **API Key** for use in the application.
+- Go to [https://ocr.space/ocrapi](https://ocr.space/ocrapi) and register for a free API key (the free tier allows 25,000 requests/month).
+- Copy the **API Key** that is emailed to you for use in the application.
 
 ---
 
