@@ -13,8 +13,8 @@ internal static class ConfigurationBootstrap
             "App token cannot be empty."
         );
 
-        var captchaSolverApiKey = PromptForValue(
-            "Please enter your solvecaptcha.com API key: ",
+        var ocrSpaceApiKey = PromptForValue(
+            "Please enter your ocr.space API key: ",
             "API key cannot be empty."
         );
 
@@ -23,7 +23,7 @@ internal static class ConfigurationBootstrap
         return new AppConfiguration
         {
             BotToken = botToken,
-            CaptchaSolverApiKey = captchaSolverApiKey
+            OcrSpaceApiKey = ocrSpaceApiKey
         };
     }
 
