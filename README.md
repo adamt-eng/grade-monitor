@@ -8,7 +8,7 @@ This version talks directly to the faculty's official mobile JSON API (`https://
 
 - **No CAPTCHA:** the API login endpoint takes only your student ID and password and returns a JWT access token. There is no image CAPTCHA to solve, so logins are instant and reliable.
 - **~3.5× faster:** a full grade refresh takes about **2 seconds** instead of **~7 seconds** (and the old number assumed the CAPTCHA was already solved).
-- **Far less code:** the migration removed Selenium, the CAPTCHA solver, the HTML parsers, and the per-course page fetches — a net reduction of **~840 lines**.
+- **Far less code:** the migration removed Selenium, the CAPTCHA solver, the HTML parsers, and the per-course page fetches — a net reduction of **~830 lines (~42% of the codebase)**.
 - **One request for all grades:** every course's grade breakdown comes back in a single `my_courses` call rather than one HTTP request per course page.
 
 ## :toolbox: Used Technologies
