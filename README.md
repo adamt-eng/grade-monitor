@@ -2,14 +2,22 @@
 
 An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. Supports semester selection, robust retry logic for server downtimes, and session management for faster grade access.
 
+## :zap: API-Based (v2)
+
+This version talks directly to the faculty's official mobile JSON API (`https://eng.asu.edu.eg/api`) — the same backend the ASU-ENG mobile app uses — instead of logging in through a browser and scraping HTML pages. The improvements over the previous scraping approach:
+
+- **No CAPTCHA:** the API login endpoint takes only your student ID and password and returns a JWT access token. There is no image CAPTCHA to solve, so logins are instant and reliable.
+- **~3.5× faster:** a full grade refresh takes about **2 seconds** instead of **~7 seconds** (and the old number assumed the CAPTCHA was already solved).
+- **Far less code:** the migration removed Selenium, the CAPTCHA solver, the HTML parsers, and the per-course page fetches — a net reduction of **~840 lines**.
+- **One request for all grades:** every course's grade breakdown comes back in a single `my_courses` call rather than one HTTP request per course page.
+
 ## :toolbox: Used Technologies
 
 - **.NET 10 (C#):** Core framework for building and running the application logic.
-- **HttpClient (System.Net):** Performs the entire login and grade-fetching flow over plain HTTP requests.
-- **SixLabors.ImageSharp:** Cleans up the faculty's image CAPTCHA (isolates the digits from the noise) before recognition.
-- **ocr.space API:** Reads the digits out of the image CAPTCHA shown on the login page.
-- **Json.NET (Newtonsoft.Json):** Handles JSON config files and API responses.
-- **CookieContainer (System.Net):** Stores and manages session cookies across HTTP requests.
+- **Faculty Mobile JSON API:** The official `eng.asu.edu.eg/api` endpoints (login, `my_courses`, `my_results`, `my_details`) that power the faculty mobile app.
+- **HttpClient + System.Text.Json (System.Net):** Performs the login and grade-fetching flow as JSON requests and parses the responses.
+- **JWT Bearer Auth:** The access token returned by the login endpoint authorizes every subsequent request.
+- **Json.NET (Newtonsoft.Json):** Handles the JSON config file.
 - **Discord.Net:** A C# wrapper for the Discord API, enabling bot interaction, slash commands, and message handling.
 
 ---
@@ -36,29 +44,26 @@ Use the `/get-grades` command to log in and retrieve your grades for the first t
 
 ### :books: Semester Selection
 
-Choose which semester’s grades to view using the dropdown menu. By default, the most recent semester is selected.
+Choose which semester’s grades to view using the dropdown menu. The current term shows live, in-progress grades (midterm, activities, etc.) from `my_courses`, while past semesters show their final letter grades from `my_results`. By default, the current term is selected.
 
 ---
 
 ### :gear: Mode Selection
 
-Choose between two grade-fetching modes to suit your needs:
+Choose between two grade-fetching modes for the current term:
 
 - **Mode 1 – Final Grades:**
-  Fetches only final grades to reduce HTTP requests. Useful during peak times when the faculty servers are already under heavy load.
+  Shows only the final course grade once it has been released.
 
 - **Mode 2 – All Grades (Default):**
-  Retrieves all course grades such as final, midterm, activities, etc.
+  Shows the full grade breakdown such as midterm, activities, practical, etc.
 
 ---
 
-### :arrows_counterclockwise: Manual Refresh Options
+### :arrows_counterclockwise: Manual Refresh
 
 - **Refresh Grades Button:**
-  Manually refresh the grade data for the selected semester and mode.
-
-- **Refresh Courses Button:**
-  Force-refresh your course list. Useful if you’ve recently registered, dropped, or withdrawn from courses.
+  Manually refresh the grade data for the selected semester and mode. Because `my_courses` is always live, this always reflects the latest data with no caching to clear.
 
 ---
 
@@ -79,14 +84,11 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ## :gear: Technical Features
 
-* **:key: Login via HTTP:**
-  Logs in by talking to the faculty portal directly over HTTP — no browser automation required.
+* **:key: Login via JSON API:**
+  Logs in by POSTing the student ID and password to the faculty's API login endpoint, which returns a JWT access token — no browser automation and no CAPTCHA.
 
-* **:robot: CAPTCHA Solver Integration:**
-  Reads the faculty's image CAPTCHA automatically: the digits are isolated from the background noise with [ImageSharp](https://github.com/SixLabors/ImageSharp) and recognized via [ocr.space](https://ocr.space). Because new CAPTCHAs are free to fetch, the app keeps trying fresh ones until it gets a confident read before submitting. (The previous reCAPTCHA + [SolveCaptcha](https://solvecaptcha.com) solver is kept in the codebase in case the faculty switches back.)
-
-* **:cookie: Session Persistence:**
-  Uses `CookieContainer` to store session cookies and reduce the need for repeated logins.
+* **:ticket: Token Persistence:**
+  The access token is stored and reused across refreshes. When it expires (the API returns `401`), the app transparently logs in again to obtain a fresh token.
 
 * **:repeat: Robust Retry System:**
   Automatically switches to a shorter retry interval during faculty site downtime, so grades are retrieved as soon as the site comes back online.
@@ -99,8 +101,8 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 ## :wrench: Configuration
 
 - The config file `config.json` stores user credentials and application settings. **Do not edit manually.**
-- The `Laravel_Session` value in `config.json` is no longer modifiable via command. Previously, users could log in by directly providing the session cookie, but this is no longer supported due to the expiration date now embedded in the cookie. Instead, the login process uses the student ID and password via Selenium to retrieve and store a valid session token.
-- If you change your password on the faculty site, you can update it in the application by re-running the `/get-grades` command with the new password.
+- Each user entry holds the **Student ID**, **Password**, and an auto-managed **AccessToken**. The token is refreshed automatically; you never need to touch it.
+- If you change your password on the faculty site, update it in the application by re-running the `/get-grades` command with the new password.
 
 ---
 
@@ -118,14 +120,7 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 ---
 
-### :two: Get an API Key from ocr.space
-
-- Go to [https://ocr.space/ocrapi](https://ocr.space/ocrapi) and register for a free API key (the free tier allows 25,000 requests/month).
-- Copy the **API Key** that is emailed to you for use in the application.
-
----
-
-### :three: Prerequisites
+### :two: Prerequisites
 
 Make sure you have [.NET 10.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) installed.
 
@@ -137,7 +132,7 @@ dotnet --version
 
 ---
 
-### :four: Clone the Repository
+### :three: Clone the Repository
 
 ```bash
 git clone https://github.com/adamt-eng/grade-monitor
@@ -145,7 +140,7 @@ git clone https://github.com/adamt-eng/grade-monitor
 
 ---
 
-### :five: Navigate to the Project Directory
+### :four: Navigate to the Project Directory
 
 ```bash
 cd grade-monitor
@@ -153,7 +148,7 @@ cd grade-monitor
 
 ---
 
-### :six: Restore and Build the Project
+### :five: Restore and Build the Project
 
 ```bash
 dotnet restore
@@ -162,7 +157,7 @@ dotnet build --configuration Release
 
 ---
 
-### :seven: Run the Application
+### :six: Run the Application
 
 ```bash
 dotnet run
