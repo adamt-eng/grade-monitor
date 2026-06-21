@@ -11,6 +11,8 @@ This version talks directly to the faculty's official mobile JSON API (`https://
 - **Far less code:** the migration removed Selenium, the CAPTCHA solver, the HTML parsers, and the per-course page fetches — a net reduction of **~830 lines (~42% of the codebase)**.
 - **One request for all grades:** every course's grade breakdown comes back in a single `my_courses` call rather than one HTTP request per course page.
 
+> :book: A full reference for the faculty API is included in **[API.md](API.md)** — endpoints, requests, responses, and status codes.
+
 ## :toolbox: Used Technologies
 
 - **.NET 10 (C#):** Core framework for building and running the application logic.
