@@ -1,4 +1,6 @@
-﻿using Grade_Monitor.Models;
+using Grade_Monitor.Models;
+using System.Collections.Generic;
+using System.Text.Json.Nodes;
 
 namespace Grade_Monitor.Core.Session;
 
@@ -9,13 +11,13 @@ internal sealed class SessionState
     internal int Fails;
 
     internal bool FetchFinalGrades;
-    internal bool FetchedFinalGradesOnce;
 
     internal string? RequestedSemester;
     internal string? Cgpa;
 
-    internal string? StudentCoursesHtml;
     internal string? CurrentSemester { get; set; }
+    internal HashSet<string> Semesters { get; set; } = [];
+    internal JsonNode? Results { get; set; }
 
     internal SessionState(User user) => User = user;
 }

@@ -1,4 +1,4 @@
-﻿using Grade_Monitor.Helpers;
+using Grade_Monitor.Helpers;
 using Grade_Monitor.Models;
 using System;
 
@@ -13,17 +13,11 @@ internal static class ConfigurationBootstrap
             "App token cannot be empty."
         );
 
-        var ocrSpaceApiKey = PromptForValue(
-            "Please enter your ocr.space API key: ",
-            "API key cannot be empty."
-        );
-
         Console.Clear();
 
         return new AppConfiguration
         {
-            BotToken = botToken,
-            OcrSpaceApiKey = ocrSpaceApiKey
+            BotToken = botToken
         };
     }
 

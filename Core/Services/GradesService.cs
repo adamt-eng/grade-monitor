@@ -1,88 +1,96 @@
-using Grade_Monitor.Core.Parsing;
 using Grade_Monitor.Core.Session;
-using Grade_Monitor.Helpers;
-using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace Grade_Monitor.Core.Services;
 
 internal sealed class GradesService
 {
-    private readonly HttpHelper _http;
-    private readonly CourseUrlService _urlService;
+    private const string NoGrades = "No grades available yet.";
 
-    internal GradesService(HttpHelper http, CourseUrlService urlService)
-    {
-        _http = http;
-        _urlService = urlService;
-    }
+    private readonly AuthService _auth;
+
+    internal GradesService(AuthService auth) => _auth = auth;
 
     internal async Task<SortedDictionary<string, string>> FetchGradesAsync(SessionState state)
     {
-        if (state is { FetchFinalGrades: true, FetchedFinalGradesOnce: false })
-            return await FetchFinalGradesAsync(state);
+        if (state.RequestedSemester != null && state.RequestedSemester != state.CurrentSemester)
+            return FetchPastSemester(state);
 
-        state.FetchedFinalGradesOnce = false;
-
-        var courses = await _urlService.ResolveAsync(state);
-        var results = new SortedDictionary<string, string>();
-
-        await Task.WhenAll(courses.Select(async kv =>
-        {
-            var html = await _http.FetchPage(kv.Value, state.User.DiscordUserId);
-            results[kv.Key] = ExtractGradeDetails(html);
-        }));
-
-        return results;
+        return await FetchCurrentSemesterAsync(state);
     }
 
-    internal async Task<SortedDictionary<string, string>> FetchFinalGradesAsync(SessionState state)
+    private async Task<SortedDictionary<string, string>> FetchCurrentSemesterAsync(SessionState state)
     {
+        var data = await _auth.GetDataAsync(state, "students/my_courses");
+        var completed = CompletedCodes(state.Results);
         var results = new SortedDictionary<string, string>();
 
-        foreach (var c in CourseParser.Parse(state.StudentCoursesHtml!)
-                                 .Where(c => c.Semester == state.RequestedSemester && !string.IsNullOrEmpty(c.Grade)))
+        foreach (var study in data["studies"]?.AsArray() ?? [])
         {
-            results[c.FullName] = $"||**__Course Grade: {c.Grade}__**||";
-        }
+            if (study == null)
+                continue;
 
-        if (results.Count == 0)
-        {
-            state.FetchedFinalGradesOnce = true;
-            return await FetchGradesAsync(state);
+            var code = study["code"]?.GetValue<string>();
+            if (code != null && completed.Contains(code))
+                continue;
+
+            var name = $"{code}: {study["en_name"]?.GetValue<string>()}";
+            results[name] = FormatCurrent(study, state.FetchFinalGrades);
         }
 
         return results;
     }
 
-    private static string ExtractGradeDetails(string html)
+    private static HashSet<string> CompletedCodes(JsonNode? results)
     {
-        var lines = html.Split('\n').Where(ContainsGradeIdentifier).ToList();
-        var details = new List<string>();
+        var codes = new HashSet<string>();
 
-        for (var i = 0; i < lines.Count; i++)
-        {
-            var line = lines[i];
+        foreach (var semester in results?["results"]?.AsArray() ?? [])
+            foreach (var course in semester?["grades"]?.AsArray() ?? [])
+                if (course?["code"]?.GetValue<string>() is { } code)
+                    codes.Add(code);
 
-            if (line.Contains("right"))
-            {
-                var grade = line.ExtractBetween(">", "<").Trim();
-                details.Add($"||**__Course Grade: {grade}__**||");
-            }
-            else if (line.Contains("left"))
-            {
-                var title = line.ExtractBetween(">", "<");
-                var value = lines[++i].ExtractBetween(">", "<").Replace(" ", "");
-                details.Add($"{title}: {value}");
-            }
-        }
-
-        var result = string.Join(Environment.NewLine, details).Trim();
-        return result.Length > 0 ? result : "No grades available yet.";
+        return codes;
     }
 
-    private static bool ContainsGradeIdentifier(string s) =>
-        s.Contains("text-align: right;") || s.Contains("7 col");
+    private static SortedDictionary<string, string> FetchPastSemester(SessionState state)
+    {
+        var results = new SortedDictionary<string, string>();
+
+        var semester = state.Results?["results"]?.AsArray()
+            .FirstOrDefault(r => r?["en_term"]?.GetValue<string>() == state.RequestedSemester);
+
+        foreach (var course in semester?["grades"]?.AsArray() ?? [])
+        {
+            if (course == null)
+                continue;
+
+            var name = $"{course["code"]?.GetValue<string>()}: {course["en_name"]?.GetValue<string>()}";
+            results[name] = FinalGrade(course["grade"]?["grade"]?.GetValue<string>());
+        }
+
+        return results;
+    }
+
+    private static string FormatCurrent(JsonNode study, bool finalOnly)
+    {
+        var finalLetter = study["grade"]?["grade"]?.GetValue<string>();
+        if (finalOnly && !string.IsNullOrEmpty(finalLetter))
+            return FinalGrade(finalLetter);
+
+        var lines = (study["grades_detailes"]?.AsArray() ?? [])
+            .Where(g => g != null)
+            .Select(g => $"{g!["en_name"]?.GetValue<string>()}: {Degree(g)}/{g["max_degree"]?.GetValue<int>()}")
+            .ToList();
+
+        return lines.Count > 0 ? string.Join("\n", lines) : NoGrades;
+    }
+
+    private static string Degree(JsonNode component) =>
+        component["degree"] is { } d ? d.GetValue<int>().ToString() : "—";
+
+    private static string FinalGrade(string? letter) => $"||**__Course Grade: {letter}__**||";
 }

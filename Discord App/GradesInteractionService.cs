@@ -67,7 +67,7 @@ internal static class GradesInteractionService
                 };
 
                 var components = DiscordHelper.CreateMessageComponent(
-                    semesters: [.. sessionState.User.Semesters.Keys],
+                    semesters: sessionState.Semesters,
                     requestedSemester: sessionState.RequestedSemester,
                     fetchFinalGradesOnly: sessionState.FetchFinalGrades
                 );

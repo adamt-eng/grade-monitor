@@ -1,7 +1,8 @@
-﻿using Discord;
+using Discord;
 using Grade_Monitor.Core.Services;
-using Grade_Monitor.Helpers;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Grade_Monitor.Core.Session;
@@ -9,37 +10,29 @@ namespace Grade_Monitor.Core.Session;
 internal sealed class SessionManager
 {
     private readonly AuthService _auth;
-    private readonly StudentCoursesService _coursesService;
     private readonly GradesService _grades;
 
-    internal SessionManager(
-        AuthService authService,
-        StudentCoursesService studentCoursesService,
-        GradesService gradesService)
+    internal SessionManager(AuthService authService, GradesService gradesService)
     {
         _auth = authService;
-        _coursesService = studentCoursesService;
         _grades = gradesService;
     }
 
     internal async Task InitializeSessionAsync(SessionState state, IUserMessage? message)
     {
-        // 1. Authenticate + load dashboard
-        var dashboardHtml = await _auth.LoginAndGetDashboardHtmlAsync(state);
+        var details = await _auth.PostDataAsync(state, "students/my_details");
+        state.CurrentSemester = details["study"]?["en_term"]?.GetValue<string>();
 
-        // 2. Extract CGPA
-        state.Cgpa = dashboardHtml.ExtractBetween("\"text-white\">", "<", lastIndexOf: false);
+        var results = await _auth.GetDataAsync(state, "students/my_results");
+        state.Results = results;
 
-        // 3. Load student_courses page
-        await _coursesService.LoadAsync(state);
+        var semesters = results["results"]?.AsArray() ?? [];
+        state.Cgpa = semesters.LastOrDefault()?["grade"]?["cumulative_gpa"]?.GetValue<double>().ToString(CultureInfo.InvariantCulture);
 
-        // 4. Extract current semester
-        state.CurrentSemester = SemesterService.ExtractCurrentSemester(state.StudentCoursesHtml!);
+        state.Semesters = [.. semesters.Select(r => r?["en_term"]?.GetValue<string>()).OfType<string>()];
+        if (state.CurrentSemester != null)
+            state.Semesters.Add(state.CurrentSemester);
 
-        // 5. Populate semester list
-        SemesterService.PopulateSemesters(state);
-
-        // 6. Determine RequestedSemester
         SemesterService.DetermineRequestedSemester(state, message);
     }
 

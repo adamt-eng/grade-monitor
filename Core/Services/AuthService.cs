@@ -3,147 +3,63 @@ using Grade_Monitor.Core.Session;
 using Grade_Monitor.Discord_App;
 using Grade_Monitor.Helpers;
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 
 namespace Grade_Monitor.Core.Services;
 
 internal sealed class AuthService
 {
-    private const string BaseUrl = "https://eng.asu.edu.eg";
+    private static readonly object EmptyBody = new();
 
-    // The login endpoint is throttled (observed X-RateLimit-Limit: 3 per email + IP),
-    // so we get only a handful of real submissions before being blocked for a while.
-    private const int MaxLoginSubmits = 3;
+    private readonly ApiClient _api;
 
-    // Fetching and reading a CAPTCHA is free and unlimited, so we keep regenerating until
-    // we get a confident six-digit read before spending one of the scarce login submits.
-    private const int MaxCaptchaReads = 12;
+    internal AuthService(ApiClient api) => _api = api;
 
-    // The faculty validates the CAPTCHA before the credentials, so this exact message means
-    // our answer was wrong (regenerate + retry). Any other alert is a credential/account
-    // problem where retrying only burns the limited login attempts.
-    private const string CaptchaErrorText = "Server error, invalid request.";
+    internal Task<JsonNode> GetDataAsync(SessionState state, string path) =>
+        AuthorizedAsync(state, token => _api.GetAsync(path, token, state.User.DiscordUserId));
 
-    private readonly HttpHelper _http;
+    internal Task<JsonNode> PostDataAsync(SessionState state, string path) =>
+        AuthorizedAsync(state, token => _api.PostAsync(path, EmptyBody, token, state.User.DiscordUserId));
 
-    internal AuthService(HttpHelper httpHelper)
+    private async Task<JsonNode> AuthorizedAsync(SessionState state, Func<string, Task<JsonNode>> send)
     {
-        _http = httpHelper;
-    }
+        if (string.IsNullOrEmpty(state.User.AccessToken))
+            await LoginAsync(state);
 
-    internal async Task<string> LoginAndGetDashboardHtmlAsync(SessionState state)
-    {
-        var discordUserId = state.User.DiscordUserId;
-
-        // Use stored cookies first
-        if (!string.IsNullOrEmpty(state.User.LaravelSession))
+        var root = await send(state.User.AccessToken!);
+        if (IsExpired(root))
         {
-            _http.SetCookie(BaseUrl, $"laravel_session={state.User.LaravelSession}");
-            _http.SetCookie(BaseUrl, $"asueng_web={state.User.LaravelSession}");
-
-            var cached = await _http.FetchPage($"{BaseUrl}/dashboard", discordUserId);
-            if (cached.Contains("my_courses"))
-                return cached;
-
-            if (cached.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Unable to fetch grades: Please complete the mandatory questionnaire.");
+            await LoginAsync(state);
+            root = await send(state.User.AccessToken!);
         }
 
-        var html = await PerformLoginAsync(state);
-
-        // Store session token for reuse
-        var session = _http.GetCookieValue("asueng_web") ?? _http.GetCookieValue("laravel_session");
-        if (session != null)
-        {
-            state.User.LaravelSession = session;
-            ConfigurationManager.Save(DiscordApp.AppConfig);
-        }
-
-        return html;
+        return Unwrap(root);
     }
 
-    private async Task<string> PerformLoginAsync(SessionState state)
+    private async Task LoginAsync(SessionState state)
     {
-        var discordUserId = state.User.DiscordUserId;
+        var body = new { email = $"{state.User.StudentId}@eng.asu.edu.eg", password = state.User.Password };
+        var root = await _api.PostAsync("login", body, null, state.User.DiscordUserId);
 
-        // CSRF token (stays valid across failed attempts within the session)
-        var loginPage = await _http.FetchPage($"{BaseUrl}/login", discordUserId);
-        var csrfToken = loginPage.ExtractBetween("name=\"_token\" value=\"", "\"", lastIndexOf: false);
+        var token = Unwrap(root)["security"]?["accessToken"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(token))
+            throw new Exception("Login failed: no access token returned.");
 
-        for (var submit = 1; submit <= MaxLoginSubmits; submit++)
-        {
-            var (captchaToken, answer) = await SolveCaptchaAsync(discordUserId);
-
-            var fields = new[]
-            {
-                new KeyValuePair<string, string>("_token", csrfToken),
-                new KeyValuePair<string, string>("email", $"{state.User.StudentId}@eng.asu.edu.eg"),
-                new KeyValuePair<string, string>("password", state.User.Password),
-                new KeyValuePair<string, string>("captcha_token", captchaToken),
-                new KeyValuePair<string, string>("captcha_answer", answer)
-            };
-
-            LoggingService.WriteLog($"{discordUserId}: Submitting login {submit}/{MaxLoginSubmits}", ConsoleColor.DarkGreen);
-            var result = await _http.PostForm($"{BaseUrl}/login", fields, discordUserId, referer: $"{BaseUrl}/login");
-
-            if (result.Contains("my_courses"))
-                return result;
-
-            if (result.Contains("Questionnaire", StringComparison.OrdinalIgnoreCase))
-                throw new Exception("Unable to fetch grades: Please complete the mandatory questionnaire.");
-
-            var alert = ExtractAlert(result);
-            if (alert == CaptchaErrorText)
-            {
-                LoggingService.WriteLog($"{discordUserId}: CAPTCHA rejected by server, retrying with a new one", ConsoleColor.DarkYellow);
-                continue;
-            }
-
-            // Not a CAPTCHA issue - retrying won't help and would waste the limited login attempts.
-            throw new Exception(alert != null
-                ? $"Login failed: {alert}"
-                : "Login failed: credentials incorrect.");
-        }
-
-        throw new Exception("Login failed: could not solve the CAPTCHA after multiple attempts.");
+        state.User.AccessToken = token;
+        ConfigurationManager.Save(DiscordApp.AppConfig);
     }
 
-    // Generates fresh CAPTCHAs (free and unlimited) until one is read confidently as six digits.
-    private async Task<(string token, string answer)> SolveCaptchaAsync(ulong discordUserId)
+    private static bool IsExpired(JsonNode root) => root["code"]?.GetValue<int>() == 401;
+
+    private static JsonNode Unwrap(JsonNode root)
     {
-        for (var attempt = 1; attempt <= MaxCaptchaReads; attempt++)
-        {
-            var (token, imageUrl) = await GetCaptchaAsync(discordUserId);
-            var image = await _http.FetchBytes(imageUrl, discordUserId);
+        if (root["code"]?.GetValue<int>() == 200 && root["data"] is { } data)
+            return data;
 
-            var answer = await ImageCaptchaSolver.SolveAsync(image, discordUserId);
-            if (answer != null)
-                return (token, answer);
-        }
-
-        throw new Exception("Unable to read a CAPTCHA after several attempts.");
-    }
-
-    private async Task<(string token, string imageUrl)> GetCaptchaAsync(ulong discordUserId)
-    {
-        var json = await _http.FetchPage($"{BaseUrl}/captcha/generate", discordUserId);
-        var token = json.ExtractBetween("\"token\":\"", "\"", lastIndexOf: false);
-        var imageUrl = json.ExtractBetween("\"image_url\":\"", "\"", lastIndexOf: false).Replace("\\/", "/");
-        return (token, imageUrl);
-    }
-
-    private static string? ExtractAlert(string html)
-    {
-        const string marker = "alert alert-danger\" style=\"color: darkred\">";
-
-        var start = html.IndexOf(marker, StringComparison.Ordinal);
-        if (start < 0)
-            return null;
-
-        start += marker.Length;
-        var end = html.IndexOf("</div>", start, StringComparison.Ordinal);
-
-        return end < 0 ? null : html[start..end].Trim();
+        var message = root["message"]?.GetValue<string>();
+        var error = (root["error"] as JsonArray)?.FirstOrDefault()?["error"]?.GetValue<string>();
+        throw new Exception($"API error: {message ?? error ?? "request failed"}");
     }
 }

@@ -53,13 +53,6 @@ internal static class DiscordHelper
             .WithEmote(new Emoji("\uD83D\uDD04"))
             .WithCustomId("refresh-grades");
 
-    private static ButtonBuilder RefetchCoursesButton() =>
-        new ButtonBuilder()
-            .WithLabel("Refetch Courses")
-            .WithStyle(ButtonStyle.Secondary)
-            .WithEmote(new Emoji("\uD83D\uDD04"))
-            .WithCustomId("refetch-courses");
-
     internal static MessageComponent CreateMessageComponent() =>
         CreateMessageComponent(null, null, false);
 
@@ -74,8 +67,7 @@ internal static class DiscordHelper
         }
 
         cb.AddRow(new ActionRowBuilder()
-            .WithButton(RefreshGradesButton())
-            .WithButton(RefetchCoursesButton()));
+            .WithButton(RefreshGradesButton()));
 
         return cb.Build();
     }

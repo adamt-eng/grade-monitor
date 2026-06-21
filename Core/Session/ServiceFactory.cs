@@ -1,4 +1,4 @@
-﻿using Grade_Monitor.Core.Services;
+using Grade_Monitor.Core.Services;
 using Grade_Monitor.Helpers;
 
 namespace Grade_Monitor.Core.Session;
@@ -7,17 +7,11 @@ internal static class ServiceFactory
 {
     internal static SessionManager CreateSessionManager()
     {
-        var http = new HttpHelper();
+        var api = new ApiClient();
 
-        var auth = new AuthService(http);
-        var studentCourses = new StudentCoursesService(http);
-        var courseUrlService = new CourseUrlService(http);
-        var grades = new GradesService(http, courseUrlService);
+        var auth = new AuthService(api);
+        var grades = new GradesService(auth);
 
-        return new SessionManager(
-            auth,
-            studentCourses,
-            grades
-        );
+        return new SessionManager(auth, grades);
     }
 }
