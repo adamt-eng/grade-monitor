@@ -68,6 +68,7 @@ Everything is driven by single keypresses (no typing commands):
 | `M` | Switch grade mode (final-only / all grades) |
 | `I` | Change the refresh intervals |
 | `C` | Update your credentials (e.g. after a password change) |
+| `H` | Hide / reveal all grades and CGPA (privacy toggle, remembered between runs) |
 | `Q` | Quit |
 
 > :bulb: All the features below work identically in terminal mode — they are simply triggered by keys/menus instead of Discord commands.
