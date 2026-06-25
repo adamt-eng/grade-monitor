@@ -15,4 +15,7 @@ public class AppConfiguration
 
     /// <summary>The single local user monitored in terminal mode.</summary>
     public User? TerminalUser { get; set; }
+
+    /// <summary>When true, terminal mode masks all grades and the CGPA (privacy toggle).</summary>
+    public bool HideGrades { get; set; }
 }

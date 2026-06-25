@@ -27,6 +27,7 @@ internal sealed class TerminalApp
         Mode,
         Interval,
         Credentials,
+        ToggleHidden,
         Quit
     }
 
@@ -58,7 +59,7 @@ internal sealed class TerminalApp
             var running = true;
             while (running)
             {
-                TerminalRenderer.Render(_state, _grades, _changedKeys, _secondsLeft, _lastUpdated, _error, _fails);
+                TerminalRenderer.Render(_state, _grades, _changedKeys, App.Config.HideGrades, _secondsLeft, _lastUpdated, _error, _fails);
 
                 switch (await WaitForActionAsync())
                 {
@@ -89,6 +90,10 @@ internal sealed class TerminalApp
                         ChangeCredentials();
                         _hasBaseline = false;
                         await RefreshAsync("Logging in…");
+                        break;
+                    case UserAction.ToggleHidden:
+                        App.Config.HideGrades = !App.Config.HideGrades;
+                        ConfigurationManager.Save(App.Config);
                         break;
                     case UserAction.Tick:
                         _secondsLeft--;
@@ -178,6 +183,7 @@ internal sealed class TerminalApp
                     case ConsoleKey.M: return UserAction.Mode;
                     case ConsoleKey.I: return UserAction.Interval;
                     case ConsoleKey.C: return UserAction.Credentials;
+                    case ConsoleKey.H: return UserAction.ToggleHidden;
                     case ConsoleKey.Q:
                     case ConsoleKey.Escape:
                         return UserAction.Quit;

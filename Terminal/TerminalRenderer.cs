@@ -12,10 +12,13 @@ namespace Grade_Monitor.Terminal;
 /// </summary>
 internal static class TerminalRenderer
 {
+    private const string Mask = "•••••";
+
     internal static void Render(
         SessionState state,
         IReadOnlyList<CourseGrade> grades,
         IReadOnlySet<string> changedKeys,
+        bool hidden,
         int secondsLeft,
         DateTime lastUpdated,
         string? error,
@@ -27,29 +30,34 @@ internal static class TerminalRenderer
         AnsiConsole.WriteLine();
 
         var mode = state.FetchFinalGrades ? "Final grades" : "All grades";
+        var cgpa = hidden ? $"[grey]{Mask}[/]" : $"[bold aqua]{Esc(state.Cgpa ?? "—")}[/]";
         AnsiConsole.MarkupLine(
             $"  [grey]Student[/] [bold]{Esc(state.User.StudentId)}[/]    " +
             $"[grey]Semester[/] [bold]{Esc(state.RequestedSemester ?? "—")}[/]    " +
             $"[grey]Mode[/] [bold]{mode}[/]    " +
-            $"[grey]CGPA[/] [bold aqua]{Esc(state.Cgpa ?? "—")}[/]");
+            $"[grey]CGPA[/] {cgpa}");
+
+        if (hidden)
+            AnsiConsole.MarkupLine("  [grey]🙈 Grades hidden — press [/][bold]H[/][grey] to reveal[/]");
 
         if (changedKeys.Count > 0)
             AnsiConsole.MarkupLine("  [black on yellow] 🔔 Grades changed! [/]");
 
         AnsiConsole.WriteLine();
-        AnsiConsole.Write(BuildTable(grades, changedKeys));
+        AnsiConsole.Write(BuildTable(grades, changedKeys, hidden));
         AnsiConsole.WriteLine();
 
         AnsiConsole.Write(new Rule().RuleStyle("grey"));
         AnsiConsole.MarkupLine(
             "  [bold]R[/][grey]efresh[/]   [bold]S[/][grey]emester[/]   [bold]M[/][grey]ode[/]   " +
-            "[bold]I[/][grey]nterval[/]   [bold]C[/][grey]redentials[/]   [bold]Q[/][grey]uit[/]");
+            "[bold]I[/][grey]nterval[/]   [bold]C[/][grey]redentials[/]   " +
+            $"[bold]H[/][grey]{(hidden ? " reveal" : "ide")}[/]   [bold]Q[/][grey]uit[/]");
 
         AnsiConsole.MarkupLine(
             error != null ? $"  [red]⚠ {Esc(error)}[/]  [grey](attempt #{fails} · retrying in {Clock(secondsLeft)})[/]" : $"  [grey]Last updated {lastUpdated:HH:mm:ss} · next refresh in[/] [bold]{Clock(secondsLeft)}[/]");
     }
 
-    private static Table BuildTable(IReadOnlyList<CourseGrade> grades, IReadOnlySet<string> changedKeys)
+    private static Table BuildTable(IReadOnlyList<CourseGrade> grades, IReadOnlySet<string> changedKeys, bool hidden)
     {
         // One row per course with a separator line between rows, so courses are clearly divided.
         // Each course's component scores live in a tight aligned sub-grid to avoid wasted space.
@@ -75,23 +83,23 @@ internal static class TerminalRenderer
             if (changedKeys.Contains(key))
                 label = $"[yellow]✨[/] {label}";
 
-            table.AddRow(new Markup(label), BuildGradesCell(course));
+            table.AddRow(new Markup(label), BuildGradesCell(course, hidden));
         }
 
         return table;
     }
 
-    private static IRenderable BuildGradesCell(CourseGrade course)
+    private static IRenderable BuildGradesCell(CourseGrade course, bool hidden)
     {
         if (course.FinalGrade is { } letter)
-            return TwoColumnGrid().AddRow(new Markup("[grey]Final Grade[/]"), new Markup(FinalMarkup(letter)));
+            return TwoColumnGrid().AddRow(new Markup("[grey]Final Grade[/]"), new Markup(FinalMarkup(letter, hidden)));
 
         if (course.Components.Count == 0)
             return new Markup("[grey]No grades yet[/]");
 
         var grid = TwoColumnGrid();
         foreach (var component in course.Components)
-            grid.AddRow(new Markup(Esc(component.Name)), new Markup(ScoreMarkup(component)));
+            grid.AddRow(new Markup(Esc(component.Name)), new Markup(ScoreMarkup(component, hidden)));
 
         return grid;
     }
@@ -104,8 +112,11 @@ internal static class TerminalRenderer
         return grid;
     }
 
-    private static string ScoreMarkup(GradeComponent component)
+    private static string ScoreMarkup(GradeComponent component, bool hidden)
     {
+        if (hidden)
+            return $"[grey]{Mask}[/]";
+
         if (component.Degree is not { } degree)
             return $"[grey]—/{component.MaxDegree}[/]";
 
@@ -115,8 +126,11 @@ internal static class TerminalRenderer
         return $"[{color}]{degree}[/][grey]/{component.MaxDegree}[/]";
     }
 
-    private static string FinalMarkup(string letter)
+    private static string FinalMarkup(string letter, bool hidden)
     {
+        if (hidden)
+            return $"[grey]{Mask}[/]";
+
         if (string.IsNullOrEmpty(letter))
             return "[grey]—[/]";
 

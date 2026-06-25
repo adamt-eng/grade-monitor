@@ -56,6 +56,7 @@ Terminal mode is a complete, Discord-free way to use the app. On first launch it
 - **Live grade table:** every course is laid out as a color-coded table — component scores tinted by how high they are, final letter grades colored by grade, with your **CGPA** in the header.
 - **Auto-refresh + countdown:** grades refresh automatically on your configured interval, with a visible countdown to the next refresh and a spinner while fetching.
 - **Change notifications:** when a grade changes, the affected course is flagged with a ✨, a `🔔 Grades changed!` banner appears, and the terminal beeps.
+- **Privacy toggle:** press `H` to hide all grades and your CGPA (course names stay visible) — handy when others can see your screen. The change indicators still fire while hidden, so you know *something* updated without revealing *what*, and the setting is remembered between runs.
 - **Resilient:** on a faculty-site error it shows the error and retries on the shorter error interval, exactly like the Discord bot.
 
 Everything is driven by single keypresses (no typing commands):
