@@ -1,5 +1,5 @@
-using Discord;
 using Grade_Monitor.Core.Services;
+using Grade_Monitor.Models;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -18,7 +18,7 @@ internal sealed class SessionManager
         _grades = gradesService;
     }
 
-    internal async Task InitializeSessionAsync(SessionState state, IUserMessage? message)
+    internal async Task InitializeSessionAsync(SessionState state, string? fallbackSemester = null)
     {
         var details = await _auth.PostDataAsync(state, "students/my_details");
         state.CurrentSemester = details["study"]?["en_term"]?.GetValue<string>();
@@ -33,9 +33,9 @@ internal sealed class SessionManager
         if (state.CurrentSemester != null)
             state.Semesters.Add(state.CurrentSemester);
 
-        SemesterService.DetermineRequestedSemester(state, message);
+        SemesterService.DetermineRequestedSemester(state, fallbackSemester);
     }
 
-    internal Task<SortedDictionary<string, string>> FetchGradesAsync(SessionState state)
+    internal Task<IReadOnlyList<CourseGrade>> FetchGradesAsync(SessionState state)
         => _grades.FetchGradesAsync(state);
 }

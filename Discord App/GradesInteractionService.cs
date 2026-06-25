@@ -36,7 +36,7 @@ internal static class GradesInteractionService
             try
             {
                 // Initialize session (login + student data + semesters)
-                await AppServices.SessionManager.InitializeSessionAsync(sessionState, message);
+                await AppServices.SessionManager.InitializeSessionAsync(sessionState, DiscordHelper.ReadSelectedSemester(message));
 
                 // Fetch grades
                 var gradesReport = await AppServices.SessionManager.FetchGradesAsync(sessionState);
@@ -45,15 +45,14 @@ internal static class GradesInteractionService
 
                 LoggingService.WriteLog($"{discordUserId}: Fetched grades in {stopwatch.ElapsedMilliseconds}ms", ConsoleColor.Yellow);
 
-                // Loops on each grade, the key is the course name and the value is the course's grade details
-                // Adds an EmbedFieldBuilder with each course data to a list
+                // Adds an EmbedFieldBuilder with each course's grade details to a list
                 var embedFieldBuilders = new List<EmbedFieldBuilder>();
                 foreach (var course in gradesReport)
                 {
                     embedFieldBuilders.Add(new EmbedFieldBuilder
                     {
-                        Name = course.Key,
-                        Value = course.Value,
+                        Name = $"{course.Code}: {course.Name}",
+                        Value = DiscordHelper.FormatCourseValue(course),
                         IsInline = false
                     });
                 }
@@ -125,7 +124,7 @@ internal static class GradesInteractionService
                 if (exception.Message.Contains("FetchPage"))
                 {
                     // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
-                    sessionState.Offset = DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes * 60;
+                    sessionState.Offset = App.Config.TimerIntervalAfterExceptionsInMinutes * 60;
                 }
 
                 ++sessionState.Fails;

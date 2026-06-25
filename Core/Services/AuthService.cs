@@ -1,6 +1,5 @@
 using Grade_Monitor.Configuration;
 using Grade_Monitor.Core.Session;
-using Grade_Monitor.Discord_App;
 using Grade_Monitor.Helpers;
 using System;
 using System.Linq;
@@ -48,7 +47,7 @@ internal sealed class AuthService
             throw new Exception("Login failed: no access token returned.");
 
         state.User.AccessToken = token;
-        ConfigurationManager.Save(DiscordApp.AppConfig);
+        ConfigurationManager.Save(App.Config);
     }
 
     private static bool IsExpired(JsonNode root) => root["code"]?.GetValue<int>() == 401;

@@ -1,6 +1,18 @@
 ## :mortar_board: Grade Monitor For Faculty of Engineering - Ain Shams University
 
-An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login) and sends them directly to the user via Discord. Supports semester selection, robust retry logic for server downtimes, and session management for faster grade access.
+An application that automates the retrieval of grades from the [ASU-ENG faculty portal](https://eng.asu.edu.eg/login). Supports semester selection, robust retry logic for server downtimes, and session management for faster grade access.
+
+## :desktop_computer: Two Ways to Run
+
+On launch, the app asks how you want to run it (you can also pick directly with a flag — see [Run the Application](#six-run-the-application)). Both modes share the same engine and expose the **same features**; the difference is purely *where* and *how* you want to watch your grades.
+
+### :robot: Discord bot
+
+Discord is basically used for keeping the program running when you're not at it but have access to Discord on your phone, for example. The reason it was made with it at all is because **Discord + VPS = always running, no issue**: park the bot on a [VPS](https://cloud.google.com/learn/what-is-a-virtual-private-server), and it monitors your grades around the clock and pings your DMs the moment something changes — wherever you are.
+
+### :desktop_computer: Terminal mode
+
+Terminal mode allows users who do not want to do the whole Discord bot setup to basically use the program very easily during the period in which final grades are expected. No bot, no server, no token — just run it, type your credentials once, and watch a live, color-coded dashboard refresh itself in your terminal until the grades you're waiting for land.
 
 ## :zap: API-Based (v2)
 
@@ -20,21 +32,50 @@ This version talks directly to the faculty's official mobile JSON API (`https://
 - **HttpClient + System.Text.Json (System.Net):** Performs the login and grade-fetching flow as JSON requests and parses the responses.
 - **JWT Bearer Auth:** The access token returned by the login endpoint authorizes every subsequent request.
 - **Json.NET (Newtonsoft.Json):** Handles the JSON config file.
+- **Spectre.Console:** Powers the rich terminal mode — tables, colors, interactive selection menus, prompts, and live status spinners.
 - **Discord.Net:** A C# wrapper for the Discord API, enabling bot interaction, slash commands, and message handling.
 
 ---
 
 ## 📸 Showcase
 
-![Showcase](Showcase.gif)
+### 🤖 Discord bot
+
+![Discord Showcase](discord-showcase.gif)
+
+### 💻 Terminal mode
+
+![Terminal Showcase](terminal-showcase.png)
 
 ---
+
+## :desktop_computer: Terminal Mode
+
+Terminal mode is a complete, Discord-free way to use the app. On first launch it asks for your **Student ID** and **Password** (entered with a masked prompt and saved locally), then drops you into a live dashboard:
+
+- **Live grade table:** every course is laid out as a color-coded table — component scores tinted by how high they are, final letter grades colored by grade, with your **CGPA** in the header.
+- **Auto-refresh + countdown:** grades refresh automatically on your configured interval, with a visible countdown to the next refresh and a spinner while fetching.
+- **Change notifications:** when a grade changes, the affected course is flagged with a ✨, a `🔔 Grades changed!` banner appears, and the terminal beeps.
+- **Resilient:** on a faculty-site error it shows the error and retries on the shorter error interval, exactly like the Discord bot.
+
+Everything is driven by single keypresses (no typing commands):
+
+| Key | Action |
+| --- | --- |
+| `R` | Refresh grades now |
+| `S` | Select a semester |
+| `M` | Switch grade mode (final-only / all grades) |
+| `I` | Change the refresh intervals |
+| `C` | Update your credentials (e.g. after a password change) |
+| `Q` | Quit |
+
+> :bulb: All the features below work identically in terminal mode — they are simply triggered by keys/menus instead of Discord commands.
 
 ## :sparkles: Features
 
 ### :closed_lock_with_key: Login
 
-Use the `/get-grades` command to log in and retrieve your grades for the first time. You’ll need to provide your **Student ID** and **Password**.
+In **Discord mode**, use the `/get-grades` command to log in and retrieve your grades for the first time. You’ll need to provide your **Student ID** and **Password**. (In **terminal mode** you are prompted for these on first launch.)
 
 **Example:**
 
@@ -104,13 +145,16 @@ Adjust how often the app checks for grade updates using the `/update-interval` c
 
 - The config file `config.json` stores user credentials and application settings. **Do not edit manually.**
 - Each user entry holds the **Student ID**, **Password**, and an auto-managed **AccessToken**. The token is refreshed automatically; you never need to touch it.
-- If you change your password on the faculty site, update it in the application by re-running the `/get-grades` command with the new password.
+- If you change your password on the faculty site, update it in the application — in Discord mode re-run `/get-grades` with the new password, in terminal mode press `C`.
+- The Discord **Bot Token** is only stored/needed when you run in Discord mode.
 
 ---
 
 ## :rocket: Setup Instructions
 
-### :one: Create a Discord Bot
+### :one: Create a Discord Bot *(optional — Discord mode only)*
+
+> :information_source: Skip this step entirely if you only want **terminal mode**.
 
 - Visit the [Discord Developer Portal](https://discord.com/developers/applications).
 - Create a new application and enable the following scopes:
@@ -163,4 +207,11 @@ dotnet build --configuration Release
 
 ```bash
 dotnet run
+```
+
+On launch you’ll be asked to choose **terminal mode** or **Discord bot**. To skip the picker (e.g. for autostart or a VPS service), pass a flag:
+
+```bash
+dotnet run -- --terminal   # or -t
+dotnet run -- --discord    # or -d
 ```

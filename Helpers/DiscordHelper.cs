@@ -1,6 +1,6 @@
 ﻿using Discord;
 using Discord.WebSocket;
-using System;
+using Grade_Monitor.Models;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +9,35 @@ namespace Grade_Monitor.Helpers;
 
 internal static class DiscordHelper
 {
+    private const string NoGrades = "No grades available yet.";
+
+    /// <summary>Reads the semester currently selected in an existing grades message, if any.</summary>
+    internal static string? ReadSelectedSemester(IUserMessage? message)
+    {
+        if (message == null)
+            return null;
+
+        var selectMenus = message.Components.OfType<ActionRowComponent>()
+            .SelectMany(r => r.Components.OfType<SelectMenuComponent>())
+            .ToList();
+
+        return selectMenus.Count > 0
+            ? selectMenus[0].Options.FirstOrDefault(o => o.IsDefault == true)?.Value
+            : null;
+    }
+
+    /// <summary>Renders a course's grade as the body text of a Discord embed field.</summary>
+    internal static string FormatCourseValue(CourseGrade course)
+    {
+        if (course.FinalGrade is { } letter)
+            return $"||**__Course Grade: {letter}__**||";
+
+        if (course.Components.Count > 0)
+            return string.Join("\n", course.Components.Select(c => $"{c.Name}: {(c.Degree?.ToString() ?? "—")}/{c.MaxDegree}"));
+
+        return NoGrades;
+    }
+
     internal static async Task EnsureCommandsExistAsync(DiscordSocketClient client)
     {
         var existing = await client.GetGlobalApplicationCommandsAsync();
@@ -74,7 +103,7 @@ internal static class DiscordHelper
 
     private static SelectMenuBuilder BuildSemesterMenu(IEnumerable<string> semesters, string? requested)
     {
-        var ordered = semesters.OrderBy(ParseSemesterOrder);
+        var ordered = SemesterOrdering.Order(semesters);
 
         var menu = new SelectMenuBuilder
         {
@@ -133,22 +162,5 @@ internal static class DiscordHelper
             return new Emoji("☀️");
 
         return sem.Contains("Spring") ? new Emoji("🌸") : new Emoji("🍂");
-    }
-
-    private static int ParseSemesterOrder(string sem)
-    {
-        var parts = sem.Split(' ');
-        var season = parts[0];
-        var year = int.Parse(parts[1]);
-
-        var seasonValue = season switch
-        {
-            "Spring" => 0,
-            "Summer" => 1,
-            "Fall" => 2,
-            _ => throw new ArgumentOutOfRangeException(nameof(sem))
-        };
-
-        return year * 10 + seasonValue;
     }
 }

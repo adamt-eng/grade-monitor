@@ -14,18 +14,14 @@ internal static class ConfigurationManager
 
     internal static AppConfiguration Load()
     {
-        AppConfiguration? config;
-
+        // Start from an empty configuration when no file exists yet. The active frontend prompts for
+        // whatever it needs (a bot token for Discord, or student credentials for terminal) and saves.
         if (!File.Exists(AppPaths.Config))
-        {
-            config = ConfigurationBootstrap.AskUserForConfiguration();
-            Save(config);
-            return config;
-        }
+            return new AppConfiguration();
 
         var json = File.ReadAllText(AppPaths.Config);
 
-        config = JsonConvert.DeserializeObject<AppConfiguration>(json, JsonSettings);
+        var config = JsonConvert.DeserializeObject<AppConfiguration>(json, JsonSettings);
 
         return config ?? throw new JsonException("Deserialized configuration is null.");
     }

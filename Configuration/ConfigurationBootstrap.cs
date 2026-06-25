@@ -1,25 +1,15 @@
 using Grade_Monitor.Helpers;
-using Grade_Monitor.Models;
 using System;
 
 namespace Grade_Monitor.Configuration;
 
 internal static class ConfigurationBootstrap
 {
-    internal static AppConfiguration AskUserForConfiguration()
-    {
-        var botToken = PromptForValue(
+    internal static string PromptBotToken() =>
+        PromptForValue(
             "Please enter your Discord app's authorization token: ",
             "App token cannot be empty."
         );
-
-        Console.Clear();
-
-        return new AppConfiguration
-        {
-            BotToken = botToken
-        };
-    }
 
     private static string PromptForValue(string promptMessage, string errorMessage)
     {

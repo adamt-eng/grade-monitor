@@ -1,4 +1,5 @@
-﻿using Grade_Monitor.Core.Session;
+﻿using Grade_Monitor.Core;
+using Grade_Monitor.Core.Session;
 using Grade_Monitor.Discord_App;
 using System;
 using System.Timers;
@@ -24,9 +25,9 @@ internal static class RefreshTimerHelper
         // The timer counts down per user; when a user’s counter reaches zero, a refresh is triggered
         // and the counter is reset to the full interval.
 
-        var intervalSeconds = DiscordApp.AppConfig.TimerIntervalInMinutes * 60;
+        var intervalSeconds = App.Config.TimerIntervalInMinutes * 60;
 
-        var userCount = DiscordApp.AppConfig.Users.Count;
+        var userCount = App.Config.Users.Count;
 
         if (userCount == 0)
             return;
@@ -38,7 +39,7 @@ internal static class RefreshTimerHelper
 
         var index = 0;
 
-        foreach (var user in DiscordApp.AppConfig.Users)
+        foreach (var user in App.Config.Users)
         {
             var discordUserId = user.DiscordUserId;
 

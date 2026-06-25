@@ -1,9 +1,9 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using Grade_Monitor.Configuration;
+using Grade_Monitor.Core;
 using Grade_Monitor.Discord_App.Handlers;
 using Grade_Monitor.Helpers;
-using Grade_Monitor.Models;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -24,10 +24,16 @@ internal class DiscordApp
         new SelectMenuHandler()
     ];
 
-    internal static AppConfiguration AppConfig = ConfigurationManager.Load();
-
     internal async Task StartAsync()
     {
+        // A bot token is only needed for Discord mode; prompt for it the first time.
+        if (string.IsNullOrWhiteSpace(App.Config.BotToken))
+        {
+            App.Config.BotToken = ConfigurationBootstrap.PromptBotToken();
+            ConfigurationManager.Save(App.Config);
+            Console.Clear();
+        }
+
         Client.Log += message =>
         {
             LoggingService.WriteLog(message.Message, ConsoleColor.Gray);
@@ -46,7 +52,7 @@ internal class DiscordApp
             RefreshTimerHelper.InitializeRefreshTimer();
         };
 
-        await Client.LoginAsync(TokenType.Bot, AppConfig.BotToken);
+        await Client.LoginAsync(TokenType.Bot, App.Config.BotToken);
         await Client.StartAsync();
         await Task.Delay(-1);
     }

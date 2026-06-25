@@ -1,5 +1,6 @@
 ﻿using Discord.WebSocket;
 using Grade_Monitor.Configuration;
+using Grade_Monitor.Core;
 using Grade_Monitor.Core.Session;
 using Grade_Monitor.Helpers;
 using Grade_Monitor.Models;
@@ -44,10 +45,10 @@ internal class CommandHandler : IDiscordEventHandler
                     break;
                 }
 
-                DiscordApp.AppConfig.TimerIntervalInMinutes = interval;
-                DiscordApp.AppConfig.TimerIntervalAfterExceptionsInMinutes = retryInterval;
+                App.Config.TimerIntervalInMinutes = interval;
+                App.Config.TimerIntervalAfterExceptionsInMinutes = retryInterval;
 
-                ConfigurationManager.Save(DiscordApp.AppConfig);
+                ConfigurationManager.Save(App.Config);
 
                 await command.FollowupAsync("Intervals updated successfully.", ephemeral: true);
                 break;
@@ -76,7 +77,7 @@ internal class CommandHandler : IDiscordEventHandler
                         Password = param2
                     };
 
-                    DiscordApp.AppConfig.Users.Add(user);
+                    App.Config.Users.Add(user);
                 }
                 else
                 {
@@ -85,7 +86,7 @@ internal class CommandHandler : IDiscordEventHandler
                     user.Password = param2;
                 }
 
-                ConfigurationManager.Save(DiscordApp.AppConfig);
+                ConfigurationManager.Save(App.Config);
 
                 await command.FollowupAsync(
                     "You will receive a private message with your grades within a few seconds.",
