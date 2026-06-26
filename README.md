@@ -6,6 +6,8 @@ An application that automates the retrieval of grades from the [ASU-ENG faculty 
 
 On launch, the app asks how you want to run it (you can also pick directly with a flag — see [Run the Application](#six-run-the-application)). Both modes share the same engine and expose the **same features**; the difference is purely *where* and *how* you want to watch your grades.
 
+![Selector Showcase](selector-showcase.png)
+
 ### :robot: Discord bot
 
 Discord is basically used for keeping the program running when you're not at it but have access to Discord on your phone, for example. The reason it was made with it at all is because **Discord + VPS = always running, no issue**: park the bot on a [VPS](https://cloud.google.com/learn/what-is-a-virtual-private-server), and it monitors your grades around the clock and pings your DMs the moment something changes — wherever you are.
