@@ -121,11 +121,10 @@ internal static class GradesInteractionService
             {
                 LoggingService.WriteLog($"{discordUserId}: Exception 1: {exception.Message}", ConsoleColor.Red);
 
-                if (exception.Message.Contains("FetchPage"))
-                {
-                    // Update timer interval to the value of TimerIntervalAfterExceptionsInMinutes
-                    sessionState.Offset = App.Config.TimerIntervalAfterExceptionsInMinutes * 60;
-                }
+                // Any exception here means the faculty site is struggling (timeout, connection
+                // refused, 5xx, or an API error). Switch to the shorter retry interval so we keep
+                // probing frequently and catch the moment it briefly comes back during grade release.
+                sessionState.Offset = App.Config.TimerIntervalAfterExceptionsInMinutes * 60;
 
                 ++sessionState.Fails;
 
