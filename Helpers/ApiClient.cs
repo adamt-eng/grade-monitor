@@ -11,9 +11,13 @@ internal sealed class ApiClient
 {
     private const string BaseUrl = "https://eng.asu.edu.eg/api/";
 
+    // The faculty API hangs (rather than refusing) when overloaded near grade-release time.
+    // A short timeout makes each probe fail fast so we can retry quickly, instead of blocking for
+    // the 100-second default and missing the brief windows when the site is briefly reachable.
     private static readonly HttpClient Http = new(new HttpClientHandler { UseProxy = false })
     {
-        BaseAddress = new Uri(BaseUrl)
+        BaseAddress = new Uri(BaseUrl),
+        Timeout = TimeSpan.FromSeconds(15)
     };
 
     internal Task<JsonNode> GetAsync(string path, string? token, ulong discordUserId) =>
